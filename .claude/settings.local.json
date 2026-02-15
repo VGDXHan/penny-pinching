@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
+      "Bash(gradle:*)",
+      "Bash(where:*)",
+      "Bash(java -version:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "Bash(./gradlew.bat assembleDebug --no-daemon)",
+      "Bash(./gradlew.bat:*)",
+      "Bash(set GRADLE_USER_HOME=D:Cachegradle-cache)"
     ]
   }
 }
