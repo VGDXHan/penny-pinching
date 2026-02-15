@@ -36,6 +36,11 @@ class StatisticsViewModel @Inject constructor(
         loadStatistics()
     }
 
+    // 刷新统计数据，用于页面重新显示时更新数据
+    fun refresh() {
+        loadStatistics()
+    }
+
     private fun loadStatistics() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)

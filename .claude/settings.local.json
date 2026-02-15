@@ -10,7 +10,14 @@
       "Bash(curl:*)",
       "Bash(./gradlew.bat assembleDebug --no-daemon)",
       "Bash(./gradlew.bat:*)",
-      "Bash(set GRADLE_USER_HOME=D:Cachegradle-cache)"
+      "Bash(set GRADLE_USER_HOME=D:Cachegradle-cache)",
+      "Bash(dir:*)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(gradle.bat assembleDebug)",
+      "Bash(git add:*)",
+      "Bash(D:/Cache/daiyu-penny/gradlew.bat -p D:/Cache/daiyu-penny assembleDebug:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
