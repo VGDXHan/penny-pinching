@@ -12,6 +12,7 @@ import com.google.gson.JsonSyntaxException
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.util.regex.Pattern
@@ -270,8 +271,11 @@ class BillParserRepositoryImpl @Inject constructor(
     }
 
     private suspend fun parseWithApi(text: String, apiKey: String): BillInfo {
+        val currentTime = LocalDateTime.now(clock)
         val prompt = """
             你是一个记账助手，请从用户的记账语句中提取信息。
+
+            重要参考信息：当前时间是 ${currentTime.year}年${currentTime.monthValue}月${currentTime.dayOfMonth}日 ${currentTime.hour}时${currentTime.minute}分
 
             用户的记账语句：$text
 
