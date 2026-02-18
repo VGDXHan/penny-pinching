@@ -142,7 +142,9 @@ class RecordsViewModel @Inject constructor(
 
         viewModelScope.launch {
             val category = categoryRepository.getCategoryById(state.editCategoryId)
-            val categoryName = category?.name ?: state.categories.find { it.id == state.editCategoryId }?.name ?: ""
+            val categoryName = category?.name
+                ?: state.categories.find { it.id == state.editCategoryId }?.name
+                ?: editingTransaction.categoryNameSnapshot
 
             val updatedTransaction = editingTransaction.copy(
                 amountCents = state.editAmount,

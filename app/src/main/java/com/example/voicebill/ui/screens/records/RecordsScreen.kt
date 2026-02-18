@@ -219,7 +219,7 @@ fun EditTransactionDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
-    var amountText by remember(editAmount) {
+    var amountText by remember {
         mutableStateOf(if (editAmount > 0) (editAmount / 100.0).toString() else "")
     }
 
