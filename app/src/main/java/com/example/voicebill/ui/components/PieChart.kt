@@ -90,7 +90,7 @@ private fun PieChartCanvas(
 ) {
     Canvas(
         modifier = modifier
-            .pointerInput(data) {
+            .pointerInput(data, selectedCategoryId) {
                 detectTapGestures { offset ->
                     val clickedCategoryId = calculateClickedSector(
                         offset = offset,
