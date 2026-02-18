@@ -86,12 +86,13 @@ class HomeViewModel @Inject constructor(
             val result = billParserRepository.parseBillText(text)
 
             if (result.parseSuccess && result.amountCents != null) {
+                val type = result.type ?: TransactionType.EXPENSE
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     parseResult = result,
-                    selectedType = result.type ?: TransactionType.EXPENSE,
+                    selectedType = type,
                     amount = result.amountCents,
-                    selectedCategoryId = findCategoryIdByName(result.categoryName),
+                    selectedCategoryId = findCategoryIdByName(result.categoryName, type),
                     selectedDate = result.date ?: System.currentTimeMillis(),
                     note = result.note ?: "",
                     parseTime = parseTime
@@ -105,9 +106,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun findCategoryIdByName(name: String?): Long? {
+    private fun findCategoryIdByName(name: String?, type: TransactionType): Long? {
         if (name == null) return null
-        return _uiState.value.categories.find { it.name == name }?.id
+        // 根据类型和名称查找分类，避免"未分类"在收入/支出之间混淆
+        return _uiState.value.categories.find { it.name == name && it.isIncome == (type == TransactionType.INCOME) }?.id
     }
 
     fun onCategorySelected(categoryId: Long) {

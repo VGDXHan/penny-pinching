@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gradlew.bat:*)",
+      "Bash(./gradlew.bat:*)",
+      "Bash(./gradlew:*)",
+      "Bash(cmd /c:*)",
+      "Bash(powershell -Command \"cd ''D:\\\\Cache\\\\daiyu-penny''; .\\\\gradlew.bat assembleDebug\")",
+      "Bash(powershell -Command:*)",
+      "Bash(if not exist .trees mkdir .trees)"
+    ]
+  },
+  "plansDirectory": ".\\.claude\\plans"
+}
