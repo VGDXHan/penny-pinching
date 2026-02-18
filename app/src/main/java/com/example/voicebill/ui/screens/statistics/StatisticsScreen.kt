@@ -232,13 +232,17 @@ fun CategorySummaryItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val safeProgress = summary.percentage
+                .takeIf { it.isFinite() }
+                ?.coerceIn(0f, 1f)
+                ?: 0f
             Column {
                 Text(
                     summary.categoryName,
                     style = MaterialTheme.typography.bodyLarge
                 )
                 LinearProgressIndicator(
-                    progress = { summary.percentage },
+                    progress = { safeProgress },
                     modifier = Modifier
                         .width(100.dp)
                         .padding(top = 4.dp),

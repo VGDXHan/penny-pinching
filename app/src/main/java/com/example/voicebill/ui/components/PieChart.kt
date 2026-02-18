@@ -110,7 +110,11 @@ private fun PieChartCanvas(
         var startAngle = -90f
 
         data.forEachIndexed { index, category ->
-            val sweepAngle = category.percentage * 360f
+            val safePercentage = category.percentage
+                .takeIf { it.isFinite() }
+                ?.coerceIn(0f, 1f)
+                ?: 0f
+            val sweepAngle = safePercentage * 360f
             val color = PieChartColors[index % PieChartColors.size]
             val isSelected = category.categoryId == selectedCategoryId
 
@@ -164,7 +168,11 @@ private fun calculateClickedSector(
 
     var startAngle = 0f
     data.forEachIndexed { index, category ->
-        val sweepAngle = category.percentage * 360f
+        val safePercentage = category.percentage
+            .takeIf { it.isFinite() }
+            ?.coerceIn(0f, 1f)
+            ?: 0f
+        val sweepAngle = safePercentage * 360f
         val endAngle = startAngle + sweepAngle
         val isLastSector = index == data.size - 1
         val actualEndAngle = if (isLastSector) 360f else endAngle
@@ -224,13 +232,17 @@ private fun PieChartLegend(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
+                        val safePercentage = category.percentage
+                            .takeIf { it.isFinite() }
+                            ?.coerceIn(0f, 1f)
+                            ?: 0f
                         Text(
                             text = category.categoryName,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
                         Text(
-                            text = "${(category.percentage * 100).toInt()}%",
+                            text = "${(safePercentage * 100).toInt()}%",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
