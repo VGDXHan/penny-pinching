@@ -74,21 +74,11 @@ app/src/main/java/com/example/voicebill/
         └── settings/      # 设置
 ```
 
-## 金额存储规范
+# 开发历程记录
 
-- 金额以"分"为单位存储 (Long 类型)
-- 字段命名: `amountCents: Long`
-- UI 展示时除以 100.0，格式化为 "¥128.00"
+> 文档索引，需要详细信息时读取对应文档
 
-## DeepSeek API 配置
+- **2026-02-15** [init_plan.md](doc/20260215_init_plan.md) - 项目架构设计、技术栈选型、模块划分、数据模型、实施步骤
+- **2026-02-16** [bugfix_and_rename.md](doc/20260216_bugfix_and_rename.md) - 修复统计页面不刷新、应用重命名为 penny-pinching
+- **2026-02-16** [deepseek_time_fix.md](doc/20260216_deepseek_time_fix.md) - 修复 DeepSeek 相对时间解析错误、Windows 构建命令经验
 
-- API Key 存储在 EncryptedSharedPreferences 中
-- API 调用使用 Retrofit，不使用外部 SDK
-
-## 数据导出/导入
-
-- 格式: JSON
-- 使用 SAF (Storage Access Framework)
-- 导出: `ACTION_CREATE_DOCUMENT`
-- 导入: `ACTION_OPEN_DOCUMENT`
-- 导入策略: 全量恢复模式（清空本地后导入）
