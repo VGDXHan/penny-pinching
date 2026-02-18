@@ -86,4 +86,5 @@ app/src/main/java/com/example/voicebill/
 - **2026-02-18** [statistics_pie_chart.md](doc/20260218_statistics_pie_chart.md) - 统计界面添加分类饼状图可视化，支持点击高亮交互
 - **2026-02-18** [export_uncategorized_fix.md](doc/20260218_export_uncategorized_fix.md) - 修复导出导入缺少 isUncategorized 字段、修复分类查找时收入/支出"未分类"混淆问题
 - **2026-02-18** [category_rename_sync_bills.md](doc/20260218_category_rename_sync_bills.md) - 分类重命名时同步更新账单名称快照
+- **2026-02-18** [fix_statistics_flicker.md](doc/20260218_fix_statistics_flicker.md) - 修复统计页面闪烁问题、移除不必要的页面刷新、修复饼图点击和列表滚动
 

@@ -39,7 +39,15 @@ class StatisticsViewModel @Inject constructor(
             selectedExpenseCategoryId = null,
             selectedIncomeCategoryId = null
         )
-        loadStatistics()
+        // 直接加载数据，避免显示加载指示器导致闪烁
+        viewModelScope.launch {
+            try {
+                val result = getStatisticsUseCase.getStatistics(period)
+                _uiState.value = _uiState.value.copy(statistics = result)
+            } catch (e: Exception) {
+                // 静默处理错误
+            }
+        }
     }
 
     fun onExpenseCategorySelected(categoryId: Long?) {
