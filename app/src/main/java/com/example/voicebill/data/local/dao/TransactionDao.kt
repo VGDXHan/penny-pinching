@@ -69,6 +69,18 @@ interface TransactionDao {
         ORDER BY dayStart ASC
     """)
     suspend fun getDailyTotals(startDate: Long, endDate: Long, dayMillis: Long): List<DailyTotal>
+
+    @Query("""
+        UPDATE transactions
+        SET categoryId = :newCategoryId,
+            categoryNameSnapshot = :newCategoryName
+        WHERE categoryId = :oldCategoryId
+    """)
+    suspend fun migrateCategoryTransactions(
+        oldCategoryId: Long,
+        newCategoryId: Long,
+        newCategoryName: String
+    )
 }
 
 data class CategoryTotal(

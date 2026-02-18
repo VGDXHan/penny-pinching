@@ -7,10 +7,11 @@ import com.example.voicebill.di.SecurePrefs
 import com.example.voicebill.domain.model.BillInfo
 import com.example.voicebill.domain.model.TransactionType
 import com.example.voicebill.domain.repository.BillParserRepository
+import com.example.voicebill.domain.repository.CategoryRepository
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
+import kotlinx.coroutines.flow.first
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -23,6 +24,7 @@ import javax.inject.Singleton
 class BillParserRepositoryImpl @Inject constructor(
     private val deepSeekApi: DeepSeekApi,
     private val securePrefs: SecurePrefs,
+    private val categoryRepository: CategoryRepository,
     private val clock: Clock = Clock.systemDefaultZone()
 ) : BillParserRepository {
 
@@ -272,6 +274,16 @@ class BillParserRepositoryImpl @Inject constructor(
 
     private suspend fun parseWithApi(text: String, apiKey: String): BillInfo {
         val currentTime = LocalDateTime.now(clock)
+
+        // 动态获取分类列表
+        val categories = categoryRepository.getAllCategories().first()
+        val expenseCategories = categories
+            .filter { !it.isIncome && !it.isUncategorized }
+            .joinToString("、") { it.name }
+        val incomeCategories = categories
+            .filter { it.isIncome && !it.isUncategorized }
+            .joinToString("、") { it.name }
+
         val prompt = """
             你是一个记账助手，请从用户的记账语句中提取信息。
 
@@ -281,7 +293,7 @@ class BillParserRepositoryImpl @Inject constructor(
 
             请从以下记账语句中提取：
             1. 金额（单位：分，即元的100倍）
-            2. 分类（只能是以下之一：餐饮、交通、购物、工资、红包、其他）
+            2. 分类（支出分类：$expenseCategories；收入分类：$incomeCategories；如果无法匹配则使用"未分类"）
             3. 类型（income 表示收入，expense 表示支出）
             4. 时间（支持：今天、昨天、上周三、下周五等自然语言，请转换为毫秒时间戳）
             5. 备注（可选，从语句中提取）

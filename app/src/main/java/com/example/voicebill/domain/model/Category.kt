@@ -7,5 +7,6 @@ data class Category(
     val color: String,
     val isIncome: Boolean,
     val isDefault: Boolean = false,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val isUncategorized: Boolean = false
 )

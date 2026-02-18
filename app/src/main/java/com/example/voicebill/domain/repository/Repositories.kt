@@ -14,9 +14,11 @@ interface CategoryRepository {
     fun getExpenseCategories(): Flow<List<Category>>
     fun getIncomeCategories(): Flow<List<Category>>
     suspend fun getCategoryById(id: Long): Category?
+    suspend fun getUncategorizedCategory(isIncome: Boolean): Category?
     suspend fun insertCategory(category: Category): Long
     suspend fun updateCategory(category: Category)
     suspend fun deleteCategory(id: Long)
+    suspend fun deleteCategoryWithMigration(id: Long)
     suspend fun restoreCategory(id: Long)
 }
 

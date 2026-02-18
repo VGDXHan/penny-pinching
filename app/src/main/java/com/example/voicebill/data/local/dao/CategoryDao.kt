@@ -47,4 +47,7 @@ interface CategoryDao {
 
     @Query("SELECT COUNT(*) FROM categories WHERE isDeleted = 0")
     suspend fun getActiveCategoryCount(): Int
+
+    @Query("SELECT * FROM categories WHERE isUncategorized = 1 AND isIncome = :isIncome AND isDeleted = 0")
+    suspend fun getUncategorizedCategory(isIncome: Boolean): CategoryEntity?
 }

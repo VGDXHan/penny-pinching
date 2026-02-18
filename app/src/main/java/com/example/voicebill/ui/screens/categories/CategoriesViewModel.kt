@@ -87,7 +87,7 @@ class CategoriesViewModel @Inject constructor(
     fun deleteCategory(id: Long) {
         viewModelScope.launch {
             try {
-                categoryRepository.deleteCategory(id)
+                categoryRepository.deleteCategoryWithMigration(id)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message)
             }
