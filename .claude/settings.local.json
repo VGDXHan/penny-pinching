@@ -19,7 +19,10 @@
       "Bash(git commit:*)",
       "Bash(git checkout:*)",
       "Bash(gradlew.bat clean assembleDebug)",
-      "Bash(D:/Cache/daiyu-penny/gradlew.bat:*)"
+      "Bash(D:/Cache/daiyu-penny/gradlew.bat:*)",
+      "Bash(gradlew.bat assembleDebug:*)",
+      "Bash(cmd /c \"gradlew.bat assembleDebug\")",
+      "Bash(cmd.exe /c gradlew.bat assembleDebug)"
     ]
   }
 }

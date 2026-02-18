@@ -26,10 +26,12 @@ data class HomeUiState(
     val selectedCategoryId: Long? = null,
     val selectedType: TransactionType = TransactionType.EXPENSE,
     val amount: Long = 0,
+    val selectedDate: Long = System.currentTimeMillis(),
     val note: String = "",
     val error: String? = null,
     val successMessage: String? = null,
-    val hasApiKey: Boolean = false
+    val hasApiKey: Boolean = false,
+    val parseTime: Long? = null
 )
 
 @HiltViewModel
@@ -76,6 +78,8 @@ class HomeViewModel @Inject constructor(
             return
         }
 
+        val parseTime = System.currentTimeMillis()
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
@@ -88,7 +92,9 @@ class HomeViewModel @Inject constructor(
                     selectedType = result.type ?: TransactionType.EXPENSE,
                     amount = result.amountCents,
                     selectedCategoryId = findCategoryIdByName(result.categoryName),
-                    note = result.note ?: ""
+                    selectedDate = result.date ?: System.currentTimeMillis(),
+                    note = result.note ?: "",
+                    parseTime = parseTime
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
@@ -120,6 +126,10 @@ class HomeViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(note = note)
     }
 
+    fun onDateSelected(date: Long) {
+        _uiState.value = _uiState.value.copy(selectedDate = date)
+    }
+
     fun saveTransaction() {
         val state = _uiState.value
 
@@ -143,7 +153,7 @@ class HomeViewModel @Inject constructor(
                 categoryId = state.selectedCategoryId,
                 categoryNameSnapshot = category?.name ?: "未知",
                 type = state.selectedType,
-                date = state.parseResult?.date ?: System.currentTimeMillis(),
+                date = state.selectedDate,
                 note = state.note.ifBlank { null },
                 rawText = state.inputText
             )

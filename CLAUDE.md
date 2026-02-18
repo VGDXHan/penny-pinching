@@ -81,4 +81,5 @@ app/src/main/java/com/example/voicebill/
 - **2026-02-15** [init_plan.md](doc/20260215_init_plan.md) - 项目架构设计、技术栈选型、模块划分、数据模型、实施步骤
 - **2026-02-16** [bugfix_and_rename.md](doc/20260216_bugfix_and_rename.md) - 修复统计页面不刷新、应用重命名为 penny-pinching
 - **2026-02-16** [deepseek_time_fix.md](doc/20260216_deepseek_time_fix.md) - 修复 DeepSeek 相对时间解析错误、Windows 构建命令经验
+- **2026-02-18** [datetime_picker.md](doc/20260218_datetime_picker.md) - 添加日期时间选择功能、修复 API Key 换行符问题、修复保存按钮被遮挡、显示解析时间功能
 
