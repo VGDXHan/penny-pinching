@@ -16,7 +16,9 @@ data class StatisticsUiState(
     val selectedPeriod: StatisticsPeriod = StatisticsPeriod.MONTHLY,
     val statistics: StatisticsResult? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val selectedExpenseCategoryId: Long? = null,
+    val selectedIncomeCategoryId: Long? = null
 )
 
 @HiltViewModel
@@ -32,8 +34,26 @@ class StatisticsViewModel @Inject constructor(
     }
 
     fun onPeriodSelected(period: StatisticsPeriod) {
-        _uiState.value = _uiState.value.copy(selectedPeriod = period)
+        _uiState.value = _uiState.value.copy(
+            selectedPeriod = period,
+            selectedExpenseCategoryId = null,
+            selectedIncomeCategoryId = null
+        )
         loadStatistics()
+    }
+
+    fun onExpenseCategorySelected(categoryId: Long?) {
+        val currentSelected = _uiState.value.selectedExpenseCategoryId
+        _uiState.value = _uiState.value.copy(
+            selectedExpenseCategoryId = if (currentSelected == categoryId) null else categoryId
+        )
+    }
+
+    fun onIncomeCategorySelected(categoryId: Long?) {
+        val currentSelected = _uiState.value.selectedIncomeCategoryId
+        _uiState.value = _uiState.value.copy(
+            selectedIncomeCategoryId = if (currentSelected == categoryId) null else categoryId
+        )
     }
 
     // 刷新统计数据，用于页面重新显示时更新数据
