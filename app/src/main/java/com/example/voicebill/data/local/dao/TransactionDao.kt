@@ -81,6 +81,13 @@ interface TransactionDao {
         newCategoryId: Long,
         newCategoryName: String
     )
+
+    @Query("""
+        UPDATE transactions
+        SET categoryNameSnapshot = :newCategoryName
+        WHERE categoryId = :categoryId
+    """)
+    suspend fun updateCategoryNameSnapshot(categoryId: Long, newCategoryName: String)
 }
 
 data class CategoryTotal(
