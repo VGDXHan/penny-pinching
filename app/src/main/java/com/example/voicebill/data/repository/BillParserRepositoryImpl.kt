@@ -143,7 +143,7 @@ class BillParserRepositoryImpl @Inject constructor(
                 } ?: continue
 
                 // 转换为分
-                return (amount * 100).toLong()
+                return Math.round(amount * 100)
             }
         }
 

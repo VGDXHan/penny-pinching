@@ -167,7 +167,7 @@ fun HomeScreen(
                             value = (uiState.amount / 100.0).toString(),
                             onValueChange = { input ->
                                 input.toDoubleOrNull()?.let {
-                                    viewModel.onAmountChanged((it * 100).toLong())
+                                    viewModel.onAmountChanged(Math.round(it * 100))
                                 }
                             },
                             label = { Text("金额") },

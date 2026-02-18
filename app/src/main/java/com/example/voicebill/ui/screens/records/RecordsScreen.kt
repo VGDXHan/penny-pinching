@@ -259,7 +259,7 @@ fun EditTransactionDialog(
                         amountText = text
                         val amount = text.toDoubleOrNull()
                         if (amount != null) {
-                            onAmountChanged((amount * 100).toLong())
+                            onAmountChanged(Math.round(amount * 100))
                         } else if (text.isEmpty()) {
                             onAmountChanged(0)
                         }
