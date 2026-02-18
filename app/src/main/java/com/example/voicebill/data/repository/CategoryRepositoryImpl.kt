@@ -50,7 +50,16 @@ class CategoryRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateCategory(category: Category) {
-        categoryDao.updateCategory(CategoryEntity.fromDomain(category))
+        val oldCategory = categoryDao.getCategoryById(category.id)
+
+        database.withTransaction {
+            categoryDao.updateCategory(CategoryEntity.fromDomain(category))
+
+            // 如果名称变化，同步更新账单的 categoryNameSnapshot
+            if (oldCategory != null && oldCategory.name != category.name) {
+                transactionDao.updateCategoryNameSnapshot(category.id, category.name)
+            }
+        }
     }
 
     override suspend fun deleteCategory(id: Long) {

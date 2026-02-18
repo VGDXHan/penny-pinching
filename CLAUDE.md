@@ -84,4 +84,5 @@ app/src/main/java/com/example/voicebill/
 - **2026-02-18** [datetime_picker.md](doc/20260218_datetime_picker.md) - 添加日期时间选择功能、修复 API Key 换行符问题、修复保存按钮被遮挡、显示解析时间功能
 - **2026-02-18** [category_delete_and_scroll.md](doc/20260218_category_delete_and_scroll.md) - 分类删除功能优化、添加"未分类"类别、统一滚动容器、语音解析动态分类
 - **2026-02-18** [statistics_pie_chart.md](doc/20260218_statistics_pie_chart.md) - 统计界面添加分类饼状图可视化，支持点击高亮交互
+- **2026-02-18** [category_rename_sync_bills.md](doc/20260218_category_rename_sync_bills.md) - 分类重命名时同步更新账单名称快照
 
