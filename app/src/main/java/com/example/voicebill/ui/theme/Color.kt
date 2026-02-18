@@ -22,3 +22,19 @@ val CategoryOther = Color(0xFFB8B8B8)
 // Income/Expense colors
 val IncomeColor = Color(0xFF4CAF50)
 val ExpenseColor = Color(0xFFF44336)
+
+// 饼图颜色方案 - 12 种区分度高的颜色
+val PieChartColors = listOf(
+    Color(0xFFFF6B6B), // 红色
+    Color(0xFF4ECDC4), // 青色
+    Color(0xFFFFE66D), // 黄色
+    Color(0xFF95E1D3), // 薄荷绿
+    Color(0xFFFF8A5B), // 橙色
+    Color(0xFFA8E6CF), // 浅绿
+    Color(0xFFFFD3B6), // 浅橙
+    Color(0xFFFFAAA5), // 粉红
+    Color(0xFFFF8B94), // 珊瑚红
+    Color(0xFFA8DADC), // 浅蓝
+    Color(0xFFF1C0E8), // 浅紫
+    Color(0xFFCFBAF0)  // 淡紫
+)
