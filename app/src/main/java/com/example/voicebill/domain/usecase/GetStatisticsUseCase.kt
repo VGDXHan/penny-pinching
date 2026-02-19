@@ -1,6 +1,7 @@
 package com.example.voicebill.domain.usecase
 
 import com.example.voicebill.data.local.dao.CategoryDao
+import com.example.voicebill.data.local.dao.CategoryTotal
 import com.example.voicebill.data.local.dao.TransactionDao
 import com.example.voicebill.domain.model.CategorySummary
 import com.example.voicebill.domain.model.DailySummary
@@ -8,7 +9,6 @@ import com.example.voicebill.domain.model.StatisticsPeriod
 import com.example.voicebill.domain.model.StatisticsResult
 import com.example.voicebill.domain.model.TransactionType
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -53,23 +53,8 @@ class GetStatisticsUseCase @Inject constructor(
             endDate
         )
 
-        val incomeCategorySummaries = incomeCategoryTotals.map { ct ->
-            CategorySummary(
-                categoryId = ct.categoryId ?: 0,
-                categoryName = ct.categoryNameSnapshot,
-                amountCents = ct.total,
-                percentage = if (totalIncome > 0) ct.total.toFloat() / totalIncome else 0f
-            )
-        }
-
-        val expenseCategorySummaries = expenseCategoryTotals.map { ct ->
-            CategorySummary(
-                categoryId = ct.categoryId ?: 0,
-                categoryName = ct.categoryNameSnapshot,
-                amountCents = ct.total,
-                percentage = if (totalExpense > 0) ct.total.toFloat() / totalExpense else 0f
-            )
-        }
+        val incomeCategorySummaries = buildCategorySummaries(incomeCategoryTotals)
+        val expenseCategorySummaries = buildCategorySummaries(expenseCategoryTotals)
 
         // 获取每日汇总
         val dailyTotals = transactionDao.getDailyTotals(startDate, endDate, DAY_MILLIS)
@@ -121,6 +106,28 @@ class GetStatisticsUseCase @Inject constructor(
                 val endOfYear = now.plusYears(1).withDayOfYear(1).atStartOfDay(zone).toInstant().toEpochMilli()
                 Pair(startOfYear, endOfYear)
             }
+        }
+    }
+
+    private fun buildCategorySummaries(categoryTotals: List<CategoryTotal>): List<CategorySummary> {
+        val positiveCategoryTotals = categoryTotals.filter { it.total > 0 }
+        val positiveTotalAmount = positiveCategoryTotals.sumOf { it.total }
+
+        if (positiveTotalAmount <= 0L) return emptyList()
+
+        return positiveCategoryTotals.map { ct ->
+            val rawPercentage = ct.total.toFloat() / positiveTotalAmount.toFloat()
+            val safePercentage = if (rawPercentage.isFinite()) {
+                rawPercentage.coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+            CategorySummary(
+                categoryId = ct.categoryId ?: 0,
+                categoryName = ct.categoryNameSnapshot,
+                amountCents = ct.total,
+                percentage = safePercentage
+            )
         }
     }
 }

@@ -13,7 +13,8 @@ data class CategoryEntity(
     val color: String,
     val isIncome: Boolean,
     val isDefault: Boolean = false,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val isUncategorized: Boolean = false
 ) {
     fun toDomain(): Category = Category(
         id = id,
@@ -22,7 +23,8 @@ data class CategoryEntity(
         color = color,
         isIncome = isIncome,
         isDefault = isDefault,
-        isDeleted = isDeleted
+        isDeleted = isDeleted,
+        isUncategorized = isUncategorized
     )
 
     companion object {
@@ -33,7 +35,8 @@ data class CategoryEntity(
             color = category.color,
             isIncome = category.isIncome,
             isDefault = category.isDefault,
-            isDeleted = category.isDeleted
+            isDeleted = category.isDeleted,
+            isUncategorized = category.isUncategorized
         )
     }
 }

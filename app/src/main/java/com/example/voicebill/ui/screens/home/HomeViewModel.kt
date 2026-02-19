@@ -26,10 +26,12 @@ data class HomeUiState(
     val selectedCategoryId: Long? = null,
     val selectedType: TransactionType = TransactionType.EXPENSE,
     val amount: Long = 0,
+    val selectedDate: Long = System.currentTimeMillis(),
     val note: String = "",
     val error: String? = null,
     val successMessage: String? = null,
-    val hasApiKey: Boolean = false
+    val hasApiKey: Boolean = false,
+    val parseTime: Long? = null
 )
 
 @HiltViewModel
@@ -76,19 +78,24 @@ class HomeViewModel @Inject constructor(
             return
         }
 
+        val parseTime = System.currentTimeMillis()
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             val result = billParserRepository.parseBillText(text)
 
             if (result.parseSuccess && result.amountCents != null) {
+                val type = result.type ?: TransactionType.EXPENSE
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     parseResult = result,
-                    selectedType = result.type ?: TransactionType.EXPENSE,
+                    selectedType = type,
                     amount = result.amountCents,
-                    selectedCategoryId = findCategoryIdByName(result.categoryName),
-                    note = result.note ?: ""
+                    selectedCategoryId = findCategoryIdByName(result.categoryName, type),
+                    selectedDate = result.date ?: System.currentTimeMillis(),
+                    note = result.note ?: "",
+                    parseTime = parseTime
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
@@ -99,9 +106,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun findCategoryIdByName(name: String?): Long? {
+    private fun findCategoryIdByName(name: String?, type: TransactionType): Long? {
         if (name == null) return null
-        return _uiState.value.categories.find { it.name == name }?.id
+        // 根据类型和名称查找分类，避免"未分类"在收入/支出之间混淆
+        return _uiState.value.categories.find { it.name == name && it.isIncome == (type == TransactionType.INCOME) }?.id
     }
 
     fun onCategorySelected(categoryId: Long) {
@@ -118,6 +126,10 @@ class HomeViewModel @Inject constructor(
 
     fun onNoteChanged(note: String) {
         _uiState.value = _uiState.value.copy(note = note)
+    }
+
+    fun onDateSelected(date: Long) {
+        _uiState.value = _uiState.value.copy(selectedDate = date)
     }
 
     fun saveTransaction() {
@@ -143,7 +155,7 @@ class HomeViewModel @Inject constructor(
                 categoryId = state.selectedCategoryId,
                 categoryNameSnapshot = category?.name ?: "未知",
                 type = state.selectedType,
-                date = state.parseResult?.date ?: System.currentTimeMillis(),
+                date = state.selectedDate,
                 note = state.note.ifBlank { null },
                 rawText = state.inputText
             )

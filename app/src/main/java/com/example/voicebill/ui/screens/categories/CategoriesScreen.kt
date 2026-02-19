@@ -34,49 +34,53 @@ fun CategoriesScreen(
             }
         }
     ) { paddingValues ->
-        Column(
+        val expenseCategories = uiState.categories.filter { !it.isIncome }
+        val incomeCategories = uiState.categories.filter { it.isIncome }
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 支出分类
-            Text(
-                "支出分类",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp)
-            )
-
-            val expenseCategories = uiState.categories.filter { !it.isIncome }
-
-            LazyColumn {
-                items(expenseCategories) { category ->
-                    CategoryItem(
-                        category = category,
-                        onEdit = { viewModel.showEditDialog(category) },
-                        onDelete = { viewModel.deleteCategory(category.id) }
-                    )
-                }
+            // 支出分类标题
+            item {
+                Text(
+                    "支出分类",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(16.dp)
+                )
             }
 
-            HorizontalDivider()
+            // 支出分类列表
+            items(expenseCategories, key = { it.id }) { category ->
+                CategoryItem(
+                    category = category,
+                    onEdit = { viewModel.showEditDialog(category) },
+                    onDelete = { viewModel.deleteCategory(category.id) }
+                )
+            }
 
-            // 收入分类
-            Text(
-                "收入分类",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp)
-            )
+            // 分隔线
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            }
 
-            val incomeCategories = uiState.categories.filter { it.isIncome }
+            // 收入分类标题
+            item {
+                Text(
+                    "收入分类",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
 
-            LazyColumn {
-                items(incomeCategories) { category ->
-                    CategoryItem(
-                        category = category,
-                        onEdit = { viewModel.showEditDialog(category) },
-                        onDelete = { viewModel.deleteCategory(category.id) }
-                    )
-                }
+            // 收入分类列表
+            items(incomeCategories, key = { it.id }) { category ->
+                CategoryItem(
+                    category = category,
+                    onEdit = { viewModel.showEditDialog(category) },
+                    onDelete = { viewModel.deleteCategory(category.id) }
+                )
             }
         }
 
@@ -107,7 +111,13 @@ fun CategoryItem(
 
     ListItem(
         headlineContent = { Text(category.name) },
-        supportingContent = { if (category.isDefault) Text("默认分类") },
+        supportingContent = {
+            when {
+                category.isUncategorized -> Text("系统分类（不可删除）")
+                category.isDefault -> Text("默认分类")
+                else -> null
+            }
+        },
         leadingContent = {
             Icon(
                 Icons.Default.Category,
@@ -117,10 +127,10 @@ fun CategoryItem(
         },
         trailingContent = {
             Row {
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "编辑")
-                }
-                if (!category.isDefault) {
+                if (!category.isUncategorized) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = "编辑")
+                    }
                     IconButton(onClick = { showDeleteConfirm = true }) {
                         Icon(Icons.Default.Delete, contentDescription = "删除")
                     }
@@ -133,7 +143,7 @@ fun CategoryItem(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("确认删除") },
-            text = { Text("确定要删除分类 \"${category.name}\" 吗？") },
+            text = { Text("确定要删除分类 \"${category.name}\" 吗？\n\n该分类下的所有交易记录将被移动到\"未分类\"。") },
             confirmButton = {
                 TextButton(
                     onClick = {

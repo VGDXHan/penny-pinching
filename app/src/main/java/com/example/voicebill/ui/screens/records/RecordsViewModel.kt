@@ -2,7 +2,10 @@ package com.example.voicebill.ui.screens.records
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.voicebill.domain.model.Category
 import com.example.voicebill.domain.model.Transaction
+import com.example.voicebill.domain.model.TransactionType
+import com.example.voicebill.domain.repository.CategoryRepository
 import com.example.voicebill.domain.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,12 +19,19 @@ data class RecordsUiState(
     val isLoading: Boolean = false,
     val searchQuery: String = "",
     val editingTransaction: Transaction? = null,
-    val error: String? = null
+    val error: String? = null,
+    val categories: List<Category> = emptyList(),
+    val editAmount: Long = 0,
+    val editCategoryId: Long? = null,
+    val editType: TransactionType = TransactionType.EXPENSE,
+    val editDate: Long = System.currentTimeMillis(),
+    val editNote: String = ""
 )
 
 @HiltViewModel
 class RecordsViewModel @Inject constructor(
-    private val transactionRepository: TransactionRepository
+    private val transactionRepository: TransactionRepository,
+    private val categoryRepository: CategoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RecordsUiState())
@@ -29,6 +39,15 @@ class RecordsViewModel @Inject constructor(
 
     init {
         loadTransactions()
+        loadCategories()
+    }
+
+    private fun loadCategories() {
+        viewModelScope.launch {
+            categoryRepository.getAllCategories().collect { categories ->
+                _uiState.value = _uiState.value.copy(categories = categories)
+            }
+        }
     }
 
     private fun loadTransactions() {
@@ -68,5 +87,86 @@ class RecordsViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun startEditing(transaction: Transaction) {
+        _uiState.value = _uiState.value.copy(
+            editingTransaction = transaction,
+            editAmount = transaction.amountCents,
+            editCategoryId = transaction.categoryId,
+            editType = transaction.type,
+            editDate = transaction.date,
+            editNote = transaction.note ?: ""
+        )
+    }
+
+    fun onEditAmountChanged(amount: Long) {
+        _uiState.value = _uiState.value.copy(editAmount = amount)
+    }
+
+    fun onEditCategorySelected(categoryId: Long) {
+        _uiState.value = _uiState.value.copy(editCategoryId = categoryId)
+    }
+
+    fun onEditTypeSelected(type: TransactionType) {
+        val currentCategoryId = _uiState.value.editCategoryId
+        val categories = _uiState.value.categories
+        val currentCategory = categories.find { it.id == currentCategoryId }
+        val newCategoryId = if (currentCategory != null) {
+            val isIncome = type == TransactionType.INCOME
+            if (currentCategory.isIncome != isIncome) null else currentCategoryId
+        } else null
+        _uiState.value = _uiState.value.copy(editType = type, editCategoryId = newCategoryId)
+    }
+
+    fun onEditDateSelected(date: Long) {
+        _uiState.value = _uiState.value.copy(editDate = date)
+    }
+
+    fun onEditNoteChanged(note: String) {
+        _uiState.value = _uiState.value.copy(editNote = note)
+    }
+
+    fun saveEditedTransaction() {
+        val state = _uiState.value
+        val editingTransaction = state.editingTransaction ?: return
+
+        if (state.editAmount <= 0) {
+            _uiState.value = state.copy(error = "请输入有效金额")
+            return
+        }
+        if (state.editCategoryId == null) {
+            _uiState.value = state.copy(error = "请选择分类")
+            return
+        }
+
+        viewModelScope.launch {
+            val category = categoryRepository.getCategoryById(state.editCategoryId)
+            val categoryName = category?.name
+                ?: state.categories.find { it.id == state.editCategoryId }?.name
+                ?: editingTransaction.categoryNameSnapshot
+
+            val updatedTransaction = editingTransaction.copy(
+                amountCents = state.editAmount,
+                categoryId = state.editCategoryId,
+                categoryNameSnapshot = categoryName,
+                type = state.editType,
+                date = state.editDate,
+                note = state.editNote.ifBlank { null }
+            )
+            transactionRepository.updateTransaction(updatedTransaction)
+            cancelEditing()
+        }
+    }
+
+    fun cancelEditing() {
+        _uiState.value = _uiState.value.copy(
+            editingTransaction = null,
+            editAmount = 0,
+            editCategoryId = null,
+            editType = TransactionType.EXPENSE,
+            editDate = System.currentTimeMillis(),
+            editNote = ""
+        )
     }
 }

@@ -38,7 +38,9 @@ data class CategoryExport(
     @SerializedName("isDefault")
     val isDefault: Boolean,
     @SerializedName("isDeleted")
-    val isDeleted: Boolean
+    val isDeleted: Boolean,
+    @SerializedName("isUncategorized")
+    val isUncategorized: Boolean
 )
 
 data class TransactionExport(
@@ -70,7 +72,8 @@ fun CategoryEntity.toExport(): CategoryExport = CategoryExport(
     color = color,
     isIncome = isIncome,
     isDefault = isDefault,
-    isDeleted = isDeleted
+    isDeleted = isDeleted,
+    isUncategorized = isUncategorized
 )
 
 fun CategoryExport.toEntity(): CategoryEntity = CategoryEntity(
@@ -80,7 +83,8 @@ fun CategoryExport.toEntity(): CategoryEntity = CategoryEntity(
     color = color,
     isIncome = isIncome,
     isDefault = isDefault,
-    isDeleted = isDeleted
+    isDeleted = isDeleted,
+    isUncategorized = isUncategorized
 )
 
 fun TransactionEntity.toExport(): TransactionExport = TransactionExport(

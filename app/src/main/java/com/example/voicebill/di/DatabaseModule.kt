@@ -34,6 +34,7 @@ object DatabaseModule {
             VoiceBillDatabase::class.java,
             VoiceBillDatabase.DATABASE_NAME
         )
+            .addMigrations(VoiceBillDatabase.MIGRATION_1_2)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
@@ -59,6 +60,23 @@ object DatabaseModule {
 
     private suspend fun populateDefaultCategories(categoryDao: CategoryDao) {
         val defaultCategories = listOf(
+            // Uncategorized (cannot be deleted)
+            CategoryEntity(
+                name = "未分类",
+                icon = "help_outline",
+                color = "#9E9E9E",
+                isIncome = false,
+                isDefault = true,
+                isUncategorized = true
+            ),
+            CategoryEntity(
+                name = "未分类",
+                icon = "help_outline",
+                color = "#9E9E9E",
+                isIncome = true,
+                isDefault = true,
+                isUncategorized = true
+            ),
             // Expense categories
             CategoryEntity(
                 name = "餐饮",
