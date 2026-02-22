@@ -228,6 +228,18 @@ class BillParserRepositoryImpl @Inject constructor(
     }
 
     private suspend fun parseWithApi(text: String, apiKey: String): BillInfo {
+        val sanitizedApiKey = sanitizeApiKey(apiKey)
+        if (sanitizedApiKey.isBlank()) {
+            return BillInfo(
+                amountCents = null,
+                categoryName = null,
+                type = null,
+                date = null,
+                parseSuccess = false,
+                errorMessage = "请先在设置中配置 DeepSeek API Key"
+            )
+        }
+
         val zoneId = ZoneId.of(DEFAULT_TIMEZONE)
         val currentTime = LocalDateTime.now(clock.withZone(zoneId))
         val dateAnchors = buildDateAnchors(currentTime)
@@ -255,7 +267,7 @@ class BillParserRepositoryImpl @Inject constructor(
         )
 
         val response = deepSeekApi.createChatCompletion(
-            authorization = "Bearer $apiKey",
+            authorization = "Bearer $sanitizedApiKey",
             request = request
         )
 
@@ -442,6 +454,11 @@ class BillParserRepositoryImpl @Inject constructor(
             .replace(Regex("^```(?:json|JSON)?\\s*"), "")
             .replace(Regex("\\s*```$"), "")
             .trim()
+    }
+
+    // 统一移除所有空白字符，避免请求头携带换行导致解析失败
+    private fun sanitizeApiKey(raw: String): String {
+        return raw.filterNot { it.isWhitespace() }
     }
 
     private data class DateAnchors(
