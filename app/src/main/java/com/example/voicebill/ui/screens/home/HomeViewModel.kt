@@ -87,12 +87,16 @@ class HomeViewModel @Inject constructor(
 
             if (result.parseSuccess && result.amountCents != null) {
                 val type = result.type ?: TransactionType.EXPENSE
+                val resolvedCategoryId = resolveCategoryIdOrUncategorized(
+                    parsedCategoryName = result.categoryName,
+                    type = type
+                )
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     parseResult = result,
                     selectedType = type,
                     amount = result.amountCents,
-                    selectedCategoryId = findCategoryIdByName(result.categoryName, type),
+                    selectedCategoryId = resolvedCategoryId,
                     selectedDate = result.date ?: System.currentTimeMillis(),
                     note = result.note ?: "",
                     parseTime = parseTime
@@ -110,6 +114,20 @@ class HomeViewModel @Inject constructor(
         if (name == null) return null
         // 根据类型和名称查找分类，避免"未分类"在收入/支出之间混淆
         return _uiState.value.categories.find { it.name == name && it.isIncome == (type == TransactionType.INCOME) }?.id
+    }
+
+    private suspend fun resolveCategoryIdOrUncategorized(
+        parsedCategoryName: String?,
+        type: TransactionType
+    ): Long? {
+        val matchedCategoryId = findCategoryIdByName(parsedCategoryName, type)
+        if (matchedCategoryId != null) return matchedCategoryId
+
+        // DeepSeek 未命中分类时，自动回退到同类型“未分类”
+        val uncategorized = categoryRepository.getUncategorizedCategory(
+            isIncome = type == TransactionType.INCOME
+        )
+        return uncategorized?.id
     }
 
     fun onCategorySelected(categoryId: Long) {
