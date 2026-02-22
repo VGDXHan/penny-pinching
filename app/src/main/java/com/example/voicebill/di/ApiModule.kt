@@ -78,10 +78,13 @@ class SecurePrefs(context: Context) {
     )
 
     fun saveApiKey(key: String) {
-        prefs.edit().putString(ApiConstants.KEY_API_KEY, key.trim()).apply()
+        val normalizedKey = ApiKeyValidator.normalize(key)
+        prefs.edit().putString(ApiConstants.KEY_API_KEY, normalizedKey).apply()
     }
 
-    fun getApiKey(): String? = prefs.getString(ApiConstants.KEY_API_KEY, null)?.trim()?.ifEmpty { null }
+    fun getApiKey(): String? = prefs.getString(ApiConstants.KEY_API_KEY, null)
+        ?.let(ApiKeyValidator::normalize)
+        ?.ifEmpty { null }
 
     fun hasApiKey(): Boolean = getApiKey() != null
 

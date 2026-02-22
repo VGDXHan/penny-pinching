@@ -3,6 +3,7 @@ package com.example.voicebill.ui.screens.settings
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.voicebill.di.ApiKeyValidator
 import com.example.voicebill.di.SecurePrefs
 import com.example.voicebill.domain.usecase.DataOperationResult
 import com.example.voicebill.domain.usecase.ExportImportUseCase
@@ -46,14 +47,20 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveApiKey() {
-        val key = _uiState.value.apiKey.trim()
-        if (key.isNotBlank()) {
-            securePrefs.saveApiKey(key)
+        val validation = ApiKeyValidator.validate(_uiState.value.apiKey)
+        if (!validation.isValid) {
             _uiState.value = _uiState.value.copy(
-                hasApiKey = true,
-                message = "API Key 已保存"
+                message = validation.errorMessage
             )
+            return
         }
+
+        securePrefs.saveApiKey(validation.normalizedKey)
+        _uiState.value = _uiState.value.copy(
+            apiKey = validation.normalizedKey,
+            hasApiKey = true,
+            message = "API Key 已保存"
+        )
     }
 
     fun clearApiKey() {

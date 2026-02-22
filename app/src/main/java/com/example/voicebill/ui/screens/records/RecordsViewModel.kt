@@ -109,14 +109,13 @@ class RecordsViewModel @Inject constructor(
     }
 
     fun onEditTypeSelected(type: TransactionType) {
-        val currentCategoryId = _uiState.value.editCategoryId
-        val categories = _uiState.value.categories
-        val currentCategory = categories.find { it.id == currentCategoryId }
-        val newCategoryId = if (currentCategory != null) {
-            val isIncome = type == TransactionType.INCOME
-            if (currentCategory.isIncome != isIncome) null else currentCategoryId
-        } else null
-        _uiState.value = _uiState.value.copy(editType = type, editCategoryId = newCategoryId)
+        val state = _uiState.value
+        val newCategoryId = keepCategoryIfTypeMatched(
+            categoryId = state.editCategoryId,
+            type = type,
+            categories = state.categories
+        )
+        _uiState.value = state.copy(editType = type, editCategoryId = newCategoryId)
     }
 
     fun onEditDateSelected(date: Long) {
@@ -168,5 +167,15 @@ class RecordsViewModel @Inject constructor(
             editDate = System.currentTimeMillis(),
             editNote = ""
         )
+    }
+
+    private fun keepCategoryIfTypeMatched(
+        categoryId: Long?,
+        type: TransactionType,
+        categories: List<Category>
+    ): Long? {
+        val category = categories.find { it.id == categoryId } ?: return null
+        val isIncome = type == TransactionType.INCOME
+        return if (category.isIncome == isIncome) categoryId else null
     }
 }
