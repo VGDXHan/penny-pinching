@@ -12,10 +12,12 @@ import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import kotlinx.coroutines.flow.first
 import java.time.Clock
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 import java.util.regex.Pattern
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,6 +31,7 @@ class BillParserRepositoryImpl @Inject constructor(
 ) : BillParserRepository {
 
     private val gson = Gson()
+    private val dateTextFormatter = DateTimeFormatter.ofPattern(DATE_TEXT_PATTERN)
 
     // 中文数字到阿拉伯数字的映射
     private val chineseNumbers = mapOf(
@@ -67,14 +70,14 @@ class BillParserRepositoryImpl @Inject constructor(
         }
 
         try {
-            // 首先尝试本地解析
+            // 先做本地解析，提供金额/分类/备注候选
             val localResult = parseLocally(text)
-            if (localResult.parseSuccess && localResult.amountCents != null) {
-                return localResult
+            // 时间字段强制走 AI，避免本地粗解析导致偏移
+            val apiResult = parseWithApi(text, apiKey)
+            if (!apiResult.parseSuccess) {
+                return apiResult
             }
-
-            // 本地解析失败，尝试 API 解析
-            return parseWithApi(text, apiKey)
+            return mergeLocalAndApiResult(localResult, apiResult)
         } catch (e: Exception) {
             return BillInfo(
                 amountCents = null,
@@ -104,9 +107,6 @@ class BillParserRepositoryImpl @Inject constructor(
         // 解析分类
         val categoryName = parseCategory(text, type)
 
-        // 解析时间
-        val date = parseDate(text)
-
         // 解析备注（去除金额和分类相关词汇后的剩余部分）
         val note = parseNote(text)
 
@@ -114,7 +114,8 @@ class BillParserRepositoryImpl @Inject constructor(
             amountCents = amountCents,
             categoryName = categoryName,
             type = type,
-            date = date,
+            // 时间字段由 AI 统一给出，避免本地规则误判
+            date = null,
             note = note,
             parseSuccess = true
         )
@@ -204,52 +205,6 @@ class BillParserRepositoryImpl @Inject constructor(
         return "其他"
     }
 
-    private fun parseDate(text: String): Long {
-        val now = LocalDate.now(clock.withZone(ZoneId.systemDefault()))
-        val date = when {
-            text.contains("今天") -> now
-            text.contains("昨天") -> now.minusDays(1)
-            text.contains("前天") -> now.minusDays(2)
-            text.contains("明天") -> now.plusDays(1)
-            text.contains("后天") -> now.plusDays(2)
-            text.contains("上周") -> {
-                val dayOfWeek = parseDayOfWeek(text)
-                if (dayOfWeek != null) {
-                    now.minusWeeks(1).with(dayOfWeek)
-                } else now.minusWeeks(1)
-            }
-            text.contains("下周") -> {
-                val dayOfWeek = parseDayOfWeek(text)
-                if (dayOfWeek != null) {
-                    now.plusWeeks(1).with(dayOfWeek)
-                } else now.plusWeeks(1)
-            }
-            else -> {
-                val dayOfWeek = parseDayOfWeek(text)
-                dayOfWeek?.let { now.with(it) } ?: now
-            }
-        }
-
-        // 设置为当天 12:00:00
-        return date.atTime(LocalTime.NOON)
-            .atZone(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-    }
-
-    private fun parseDayOfWeek(text: String): java.time.DayOfWeek? {
-        return when {
-            text.contains("周一") || text.contains("星期一") -> java.time.DayOfWeek.MONDAY
-            text.contains("周二") || text.contains("星期二") -> java.time.DayOfWeek.TUESDAY
-            text.contains("周三") || text.contains("星期三") -> java.time.DayOfWeek.WEDNESDAY
-            text.contains("周四") || text.contains("星期四") -> java.time.DayOfWeek.THURSDAY
-            text.contains("周五") || text.contains("星期五") -> java.time.DayOfWeek.FRIDAY
-            text.contains("周六") || text.contains("星期六") -> java.time.DayOfWeek.SATURDAY
-            text.contains("周日") || text.contains("星期日") || text.contains("星期天") -> java.time.DayOfWeek.SUNDAY
-            else -> null
-        }
-    }
-
     private fun parseNote(text: String): String? {
         // 简单处理：去除金额和常见关键词后的剩余部分
         var note = text
@@ -273,7 +228,9 @@ class BillParserRepositoryImpl @Inject constructor(
     }
 
     private suspend fun parseWithApi(text: String, apiKey: String): BillInfo {
-        val currentTime = LocalDateTime.now(clock)
+        val zoneId = ZoneId.of(DEFAULT_TIMEZONE)
+        val currentTime = LocalDateTime.now(clock.withZone(zoneId))
+        val dateAnchors = buildDateAnchors(currentTime)
 
         // 动态获取分类列表
         val categories = categoryRepository.getAllCategories().first()
@@ -284,35 +241,14 @@ class BillParserRepositoryImpl @Inject constructor(
             .filter { it.isIncome && !it.isUncategorized }
             .joinToString("、") { it.name }
 
-        val prompt = """
-            你是一个记账助手，请从用户的记账语句中提取信息。
-
-            重要参考信息：当前时间是 ${currentTime.year}年${currentTime.monthValue}月${currentTime.dayOfMonth}日 ${currentTime.hour}时${currentTime.minute}分
-
-            用户的记账语句：$text
-
-            请从以下记账语句中提取：
-            1. 金额（单位：分，即元的100倍）
-            2. 分类（支出分类：$expenseCategories；收入分类：$incomeCategories；如果无法匹配则使用"未分类"）
-            3. 类型（income 表示收入，expense 表示支出）
-            4. 时间（支持：今天、昨天、上周三、下周五等自然语言，请转换为毫秒时间戳）
-            5. 备注（可选，从语句中提取）
-
-            请严格按照以下JSON格式输出，不要输出任何解释文字：
-            {"amountCents": 金额(整数分), "categoryName": "分类名", "type": "income"或"expense", "date": 时间戳(毫秒), "note": "备注(可选)"}
-
-            注意：
-            - 如果无法确定金额，amountCents 设为 null
-            - 如果是收入（工资、奖金、红包等），type 为 "income"
-            - 如果是支出（吃饭、购物、加油等），type 为 "expense"
-            - 时间以本地时区解析，"上周"以周一为起点
-            - 只输出JSON，不要输出任何其他内容
-        """.trimIndent()
+        val systemPrompt = buildSystemPrompt(expenseCategories, incomeCategories)
+        val userPrompt = buildUserPrompt(text, currentTime, dateAnchors)
 
         val request = ChatCompletionRequest(
             model = "deepseek-chat",
             messages = listOf(
-                ChatMessage(role = "user", content = prompt)
+                ChatMessage(role = "system", content = systemPrompt),
+                ChatMessage(role = "user", content = userPrompt)
             ),
             temperature = 0.1,
             maxTokens = 500
@@ -350,19 +286,24 @@ class BillParserRepositoryImpl @Inject constructor(
 
     private fun parseApiResponse(content: String): BillInfo {
         try {
-            val json = gson.fromJson(content, Map::class.java)
+            val cleanedContent = stripCodeFence(content)
+            val json = gson.fromJson(cleanedContent, Map::class.java)
 
             val amountCents = (json["amountCents"] as? Number)?.toLong()
             val categoryName = json["categoryName"] as? String
             val typeStr = json["type"] as? String
-            val dateTimestamp = (json["date"] as? Number)?.toLong()
-            val note = json["note"] as? String
+            val dateText = json["dateText"] as? String
+            val timezone = json["timezone"] as? String
+            val note = (json["note"] as? String)?.ifBlank { null }
 
             val type = when (typeStr) {
                 "income" -> TransactionType.INCOME
                 "expense" -> TransactionType.EXPENSE
                 else -> null
             }
+            // dateText 解析失败时兜底当前时间，保证可保存
+            val dateTimestamp = parseDateTextToEpochMillis(dateText, timezone)
+                ?: clock.instant().toEpochMilli()
 
             return BillInfo(
                 amountCents = amountCents,
@@ -380,7 +321,7 @@ class BillParserRepositoryImpl @Inject constructor(
     private fun extractJsonFromResponse(content: String): BillInfo? {
         // 尝试提取 JSON 对象
         val jsonPattern = Pattern.compile("\\{[^}]+\\}")
-        val matcher = jsonPattern.matcher(content)
+        val matcher = jsonPattern.matcher(stripCodeFence(content))
 
         while (matcher.find()) {
             val jsonStr = matcher.group()
@@ -392,5 +333,126 @@ class BillParserRepositoryImpl @Inject constructor(
         }
 
         return null
+    }
+
+    private fun parseDateTextToEpochMillis(dateText: String?, timezone: String?): Long? {
+        if (dateText.isNullOrBlank()) return null
+
+        val zoneId = runCatching {
+            ZoneId.of(timezone?.ifBlank { DEFAULT_TIMEZONE } ?: DEFAULT_TIMEZONE)
+        }.getOrElse {
+            ZoneId.of(DEFAULT_TIMEZONE)
+        }
+
+        val localDateTime = runCatching {
+            LocalDateTime.parse(dateText, dateTextFormatter)
+        }.getOrNull() ?: return null
+
+        return localDateTime.atZone(zoneId).toInstant().toEpochMilli()
+    }
+
+    private fun mergeLocalAndApiResult(localResult: BillInfo, apiResult: BillInfo): BillInfo {
+        val mergedAmount = localResult.amountCents ?: apiResult.amountCents
+        val mergedType = apiResult.type ?: localResult.type
+        val mergedCategory = apiResult.categoryName ?: localResult.categoryName
+        val mergedNote = apiResult.note ?: localResult.note
+        val parseSuccess = mergedAmount != null
+
+        return apiResult.copy(
+            amountCents = mergedAmount,
+            type = mergedType,
+            categoryName = mergedCategory,
+            note = mergedNote,
+            parseSuccess = parseSuccess,
+            errorMessage = if (parseSuccess) null else "无法识别金额，请补充金额后重试"
+        )
+    }
+
+    private fun buildSystemPrompt(expenseCategories: String, incomeCategories: String): String {
+        return """
+            你是中文记账语句解析器。只输出一个 JSON 对象，不要解释，不要代码块，不要 Markdown。
+
+            输出字段：
+            - amountCents: 金额（分，整数）
+            - categoryName: 分类名，无法确定填"未分类"。支出分类优先从：$expenseCategories；收入分类优先从：$incomeCategories。
+            - type: "income" 或 "expense"
+            - dateText: 绝对时间字符串，格式固定 yyyy-MM-dd HH:mm:ss
+            - timezone: 固定 "Asia/Shanghai"
+            - note: 备注，可空字符串
+
+            硬规则：
+            1) 先基于“当前时间锚点”计算绝对日期，再填 dateText。
+            2) 周起始是周一，周结束是周日。
+            3) 若用户含“上周X”：目标日期 = 上周周一 + (X的星期索引-1)天。
+            4) 若用户含“下周X”：目标日期 = 下周周一 + (X的星期索引-1)天。
+            5) 若用户仅含“周X/星期X”（无上/下）：
+               - 若X=当前星期，则取今天；
+               - 若X在当前星期之前，则取本周该日；
+               - 否则取上周该日。
+            6) 只有日期词无时段词：保留当前时分。
+            7) 有时段词则覆盖时分，分钟秒=00：
+               凌晨=03:00，早上/清晨=08:00，上午=10:00，中午=12:00，下午=16:00，傍晚=18:00，晚上/今晚/昨晚/夜里=19:00，午夜=00:00。
+            8) 如果语句没有明确年份词（如“去年/明年/2025年”），不得随意切换年份。
+            9) 输出前必须自检：
+               - 含“上周”时，dateText 必须落在上周区间；
+               - 含“下周”时，dateText 必须落在下周区间；
+               - 不满足则重新计算后再输出。
+            10) 只输出 JSON，不允许输出额外字段和解释文本。
+        """.trimIndent()
+    }
+
+    private fun buildUserPrompt(text: String, now: LocalDateTime, anchors: DateAnchors): String {
+        return """
+            当前时间：${now.format(dateTextFormatter)}
+            时区：$DEFAULT_TIMEZONE
+            当前星期：${anchors.currentWeekday}
+            本周周一：${anchors.currentWeekMonday}
+            上周周一：${anchors.previousWeekMonday}
+            下周周一：${anchors.nextWeekMonday}
+            用户语句：$text
+            请按规则输出 JSON。
+        """.trimIndent()
+    }
+
+    private fun buildDateAnchors(now: LocalDateTime): DateAnchors {
+        val currentDate = now.toLocalDate()
+        val currentWeekMonday = currentDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return DateAnchors(
+            currentWeekday = formatChineseWeekday(currentDate.dayOfWeek),
+            currentWeekMonday = currentWeekMonday.toString(),
+            previousWeekMonday = currentWeekMonday.minusWeeks(1).toString(),
+            nextWeekMonday = currentWeekMonday.plusWeeks(1).toString()
+        )
+    }
+
+    private fun formatChineseWeekday(dayOfWeek: DayOfWeek): String {
+        return when (dayOfWeek) {
+            DayOfWeek.MONDAY -> "周一"
+            DayOfWeek.TUESDAY -> "周二"
+            DayOfWeek.WEDNESDAY -> "周三"
+            DayOfWeek.THURSDAY -> "周四"
+            DayOfWeek.FRIDAY -> "周五"
+            DayOfWeek.SATURDAY -> "周六"
+            DayOfWeek.SUNDAY -> "周日"
+        }
+    }
+
+    private fun stripCodeFence(content: String): String {
+        return content.trim()
+            .replace(Regex("^```(?:json|JSON)?\\s*"), "")
+            .replace(Regex("\\s*```$"), "")
+            .trim()
+    }
+
+    private data class DateAnchors(
+        val currentWeekday: String,
+        val currentWeekMonday: String,
+        val previousWeekMonday: String,
+        val nextWeekMonday: String
+    )
+
+    companion object {
+        private const val DEFAULT_TIMEZONE = "Asia/Shanghai"
+        private const val DATE_TEXT_PATTERN = "yyyy-MM-dd HH:mm:ss"
     }
 }
