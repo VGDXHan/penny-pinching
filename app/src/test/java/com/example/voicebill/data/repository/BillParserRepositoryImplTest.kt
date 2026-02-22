@@ -14,14 +14,14 @@ import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class BillParserRepositoryImplTest {
 
@@ -73,7 +73,7 @@ class BillParserRepositoryImplTest {
 
         assertTrue(result.parseSuccess)
         // 本地金额优先，避免 AI 金额漂移
-        assertEquals(2000, result.amountCents)
+        assertEquals(2000L, result.amountCents)
         assertEquals(
             Instant.parse("2026-02-23T00:00:00Z").toEpochMilli(),
             result.date

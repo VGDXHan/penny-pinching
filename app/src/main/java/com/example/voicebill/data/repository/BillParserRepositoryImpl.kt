@@ -3,6 +3,7 @@ package com.example.voicebill.data.repository
 import com.example.voicebill.data.remote.ChatCompletionRequest
 import com.example.voicebill.data.remote.ChatMessage
 import com.example.voicebill.data.remote.DeepSeekApi
+import com.example.voicebill.di.ApiKeyValidator
 import com.example.voicebill.di.SecurePrefs
 import com.example.voicebill.domain.model.BillInfo
 import com.example.voicebill.domain.model.TransactionType
@@ -228,15 +229,15 @@ class BillParserRepositoryImpl @Inject constructor(
     }
 
     private suspend fun parseWithApi(text: String, apiKey: String): BillInfo {
-        val sanitizedApiKey = sanitizeApiKey(apiKey)
-        if (sanitizedApiKey.isBlank()) {
+        val validation = ApiKeyValidator.validate(apiKey)
+        if (!validation.isValid) {
             return BillInfo(
                 amountCents = null,
                 categoryName = null,
                 type = null,
                 date = null,
                 parseSuccess = false,
-                errorMessage = "请先在设置中配置 DeepSeek API Key"
+                errorMessage = validation.errorMessage ?: "请先在设置中配置正确的 DeepSeek API Key"
             )
         }
 
@@ -267,7 +268,7 @@ class BillParserRepositoryImpl @Inject constructor(
         )
 
         val response = deepSeekApi.createChatCompletion(
-            authorization = "Bearer $sanitizedApiKey",
+            authorization = "Bearer ${validation.normalizedKey}",
             request = request
         )
 
@@ -454,11 +455,6 @@ class BillParserRepositoryImpl @Inject constructor(
             .replace(Regex("^```(?:json|JSON)?\\s*"), "")
             .replace(Regex("\\s*```$"), "")
             .trim()
-    }
-
-    // 统一移除所有空白字符，避免请求头携带换行导致解析失败
-    private fun sanitizeApiKey(raw: String): String {
-        return raw.filterNot { it.isWhitespace() }
     }
 
     private data class DateAnchors(

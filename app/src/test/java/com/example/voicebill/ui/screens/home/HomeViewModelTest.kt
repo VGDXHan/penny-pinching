@@ -11,6 +11,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -20,7 +21,9 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -179,6 +182,103 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertNull(viewModel.uiState.value.selectedCategoryId)
+    }
+
+    @Test
+    fun `startCreating 应设置手动新增默认值`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized))
+        advanceUntilIdle()
+
+        viewModel.startCreating()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isCreating)
+        assertEquals(TransactionType.EXPENSE, state.createType)
+        assertEquals(0L, state.createAmount)
+        assertNull(state.createCategoryId)
+        assertEquals("", state.createNote)
+    }
+
+    @Test
+    fun `saveCreatedTransaction 金额非法时应报错且不入库`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized))
+        advanceUntilIdle()
+        viewModel.startCreating()
+        viewModel.onCreateCategorySelected(expenseUncategorized.id)
+
+        viewModel.saveCreatedTransaction()
+        advanceUntilIdle()
+
+        assertEquals("请输入有效金额", viewModel.uiState.value.error)
+        coVerify(exactly = 0) { transactionRepository.insertTransaction(any()) }
+    }
+
+    @Test
+    fun `saveCreatedTransaction 未选分类时应报错且不入库`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized))
+        advanceUntilIdle()
+        viewModel.startCreating()
+        viewModel.onCreateAmountChanged(1000L)
+
+        viewModel.saveCreatedTransaction()
+        advanceUntilIdle()
+
+        assertEquals("请选择分类", viewModel.uiState.value.error)
+        coVerify(exactly = 0) { transactionRepository.insertTransaction(any()) }
+    }
+
+    @Test
+    fun `saveCreatedTransaction 有备注时 rawText 应等于备注`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized))
+        val transactionSlot = slot<com.example.voicebill.domain.model.Transaction>()
+        coEvery { transactionRepository.insertTransaction(capture(transactionSlot)) } returns 1L
+        coEvery { categoryRepository.getCategoryById(expenseUncategorized.id) } returns expenseUncategorized
+
+        advanceUntilIdle()
+        viewModel.startCreating()
+        viewModel.onCreateTypeSelected(TransactionType.EXPENSE)
+        viewModel.onCreateAmountChanged(4580L)
+        viewModel.onCreateCategorySelected(expenseUncategorized.id)
+        viewModel.onCreateNoteChanged("早餐云吞")
+
+        viewModel.saveCreatedTransaction()
+        advanceUntilIdle()
+
+        assertEquals("早餐云吞", transactionSlot.captured.note)
+        assertEquals("早餐云吞", transactionSlot.captured.rawText)
+        assertFalse(viewModel.uiState.value.isCreating)
+    }
+
+    @Test
+    fun `saveCreatedTransaction 无备注时 rawText 应回退手动记账`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized))
+        val transactionSlot = slot<com.example.voicebill.domain.model.Transaction>()
+        coEvery { transactionRepository.insertTransaction(capture(transactionSlot)) } returns 1L
+        coEvery { categoryRepository.getCategoryById(expenseUncategorized.id) } returns expenseUncategorized
+
+        advanceUntilIdle()
+        viewModel.startCreating()
+        viewModel.onCreateAmountChanged(1000L)
+        viewModel.onCreateCategorySelected(expenseUncategorized.id)
+        viewModel.onCreateNoteChanged("")
+
+        viewModel.saveCreatedTransaction()
+        advanceUntilIdle()
+
+        assertNull(transactionSlot.captured.note)
+        assertEquals("手动记账", transactionSlot.captured.rawText)
+    }
+
+    @Test
+    fun `onCreateTypeSelected 类型切换应清空不匹配分类`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized))
+        advanceUntilIdle()
+        viewModel.startCreating()
+        viewModel.onCreateCategorySelected(expenseUncategorized.id)
+
+        viewModel.onCreateTypeSelected(TransactionType.INCOME)
+
+        assertNull(viewModel.uiState.value.createCategoryId)
     }
 
     private fun createViewModel(categories: List<Category>): HomeViewModel {

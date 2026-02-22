@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.voicebill.domain.model.TransactionType
+import com.example.voicebill.ui.components.ManualTransactionDialog
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -43,6 +44,11 @@ fun HomeScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = viewModel::startCreating) {
+                Icon(Icons.Default.Add, contentDescription = "手动记账")
+            }
         }
     ) { paddingValues ->
         Column(
@@ -272,6 +278,24 @@ fun HomeScreen(
                 )
             }
         }
+    }
+
+    if (uiState.isCreating) {
+        ManualTransactionDialog(
+            createAmount = uiState.createAmount,
+            createCategoryId = uiState.createCategoryId,
+            createType = uiState.createType,
+            createDate = uiState.createDate,
+            createNote = uiState.createNote,
+            categories = uiState.categories,
+            onAmountChanged = viewModel::onCreateAmountChanged,
+            onCategorySelected = viewModel::onCreateCategorySelected,
+            onTypeSelected = viewModel::onCreateTypeSelected,
+            onDateSelected = viewModel::onCreateDateSelected,
+            onNoteChanged = viewModel::onCreateNoteChanged,
+            onSave = viewModel::saveCreatedTransaction,
+            onCancel = viewModel::cancelCreating
+        )
     }
 
     // 日期选择器

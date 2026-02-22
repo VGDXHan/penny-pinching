@@ -17,15 +17,12 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
-import kotlin.math.abs
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordsViewModelTest {
@@ -48,111 +45,112 @@ class RecordsViewModelTest {
         isIncome = true
     )
 
+    private val sampleTransaction = Transaction(
+        id = 10L,
+        amountCents = 4580L,
+        categoryId = expenseCategory.id,
+        categoryNameSnapshot = expenseCategory.name,
+        type = TransactionType.EXPENSE,
+        date = 1_700_000_000_000L,
+        note = "早餐云吞",
+        rawText = "早餐云吞"
+    )
+
     @Test
-    fun startCreating_sets_expected_defaults() = runTest {
-        val transactionRepository = FakeTransactionRepository()
+    fun startEditing_shouldFillEditFields() = runTest {
+        val transactionRepository = FakeTransactionRepository(listOf(sampleTransaction))
         val categoryRepository = FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
         val viewModel = RecordsViewModel(transactionRepository, categoryRepository)
         advanceUntilIdle()
 
-        viewModel.startCreating()
+        viewModel.startEditing(sampleTransaction)
 
         val state = viewModel.uiState.value
-        assertTrue(state.isCreating)
-        assertEquals(TransactionType.EXPENSE, state.createType)
-        assertNull(state.createCategoryId)
-        assertEquals(0L, state.createAmount)
-        assertEquals("", state.createNote)
-        assertTrue(abs(System.currentTimeMillis() - state.createDate) < 5_000)
+        assertEquals(sampleTransaction.id, state.editingTransaction?.id)
+        assertEquals(sampleTransaction.amountCents, state.editAmount)
+        assertEquals(sampleTransaction.categoryId, state.editCategoryId)
+        assertEquals(sampleTransaction.type, state.editType)
     }
 
     @Test
-    fun saveCreatedTransaction_whenAmountInvalid_setsErrorAndDoesNotInsert() = runTest {
-        val transactionRepository = FakeTransactionRepository()
+    fun onEditTypeSelected_shouldClearMismatchedCategory() = runTest {
+        val transactionRepository = FakeTransactionRepository(listOf(sampleTransaction))
         val categoryRepository = FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
         val viewModel = RecordsViewModel(transactionRepository, categoryRepository)
         advanceUntilIdle()
-        viewModel.startCreating()
-        viewModel.onCreateCategorySelected(expenseCategory.id)
+        viewModel.startEditing(sampleTransaction)
 
-        viewModel.saveCreatedTransaction()
+        viewModel.onEditTypeSelected(TransactionType.INCOME)
+
+        assertNull(viewModel.uiState.value.editCategoryId)
+    }
+
+    @Test
+    fun saveEditedTransaction_whenAmountInvalid_shouldSetError() = runTest {
+        val transactionRepository = FakeTransactionRepository(listOf(sampleTransaction))
+        val categoryRepository = FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
+        val viewModel = RecordsViewModel(transactionRepository, categoryRepository)
+        advanceUntilIdle()
+        viewModel.startEditing(sampleTransaction)
+        viewModel.onEditAmountChanged(0L)
+
+        viewModel.saveEditedTransaction()
 
         assertEquals("请输入有效金额", viewModel.uiState.value.error)
-        assertEquals(0, transactionRepository.insertCallCount)
+        assertTrue(transactionRepository.updatedTransactions.isEmpty())
     }
 
     @Test
-    fun saveCreatedTransaction_whenCategoryMissing_setsErrorAndDoesNotInsert() = runTest {
-        val transactionRepository = FakeTransactionRepository()
+    fun saveEditedTransaction_whenCategoryMissing_shouldSetError() = runTest {
+        val transactionRepository = FakeTransactionRepository(listOf(sampleTransaction))
         val categoryRepository = FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
         val viewModel = RecordsViewModel(transactionRepository, categoryRepository)
         advanceUntilIdle()
-        viewModel.startCreating()
-        viewModel.onCreateAmountChanged(1200L)
+        viewModel.startEditing(sampleTransaction)
+        viewModel.onEditCategorySelected(expenseCategory.id)
+        viewModel.onEditTypeSelected(TransactionType.INCOME)
 
-        viewModel.saveCreatedTransaction()
+        viewModel.saveEditedTransaction()
 
         assertEquals("请选择分类", viewModel.uiState.value.error)
-        assertEquals(0, transactionRepository.insertCallCount)
+        assertTrue(transactionRepository.updatedTransactions.isEmpty())
     }
 
     @Test
-    fun saveCreatedTransaction_withNote_usesNoteAsRawText() = runTest {
-        val transactionRepository = FakeTransactionRepository()
+    fun saveEditedTransaction_withValidInput_shouldUpdateAndCloseEditing() = runTest {
+        val transactionRepository = FakeTransactionRepository(listOf(sampleTransaction))
         val categoryRepository = FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
         val viewModel = RecordsViewModel(transactionRepository, categoryRepository)
         advanceUntilIdle()
-        viewModel.startCreating()
-        viewModel.onCreateTypeSelected(TransactionType.EXPENSE)
-        viewModel.onCreateAmountChanged(12800L)
-        viewModel.onCreateCategorySelected(expenseCategory.id)
-        viewModel.onCreateNoteChanged("和同事吃火锅")
+        viewModel.startEditing(sampleTransaction)
+        viewModel.onEditAmountChanged(5200L)
+        viewModel.onEditCategorySelected(incomeCategory.id)
+        viewModel.onEditTypeSelected(TransactionType.INCOME)
+        viewModel.onEditNoteChanged("工资补发")
 
-        viewModel.saveCreatedTransaction()
+        viewModel.saveEditedTransaction()
         advanceUntilIdle()
 
-        assertEquals(1, transactionRepository.insertCallCount)
-        val inserted = transactionRepository.insertedTransaction
-        assertNotNull(inserted)
-        assertEquals("和同事吃火锅", inserted?.note)
-        assertEquals("和同事吃火锅", inserted?.rawText)
-        assertFalse(viewModel.uiState.value.isCreating)
+        val updated = transactionRepository.updatedTransactions.single()
+        assertEquals(5200L, updated.amountCents)
+        assertEquals(incomeCategory.id, updated.categoryId)
+        assertEquals(incomeCategory.name, updated.categoryNameSnapshot)
+        assertEquals(TransactionType.INCOME, updated.type)
+        assertEquals("工资补发", updated.note)
+        assertNull(viewModel.uiState.value.editingTransaction)
     }
 
     @Test
-    fun saveCreatedTransaction_withoutNote_setsManualRawTextFallback() = runTest {
-        val transactionRepository = FakeTransactionRepository()
+    fun deleteTransaction_shouldCallRepositoryDelete() = runTest {
+        val transactionRepository = FakeTransactionRepository(listOf(sampleTransaction))
         val categoryRepository = FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
         val viewModel = RecordsViewModel(transactionRepository, categoryRepository)
         advanceUntilIdle()
-        viewModel.startCreating()
-        viewModel.onCreateTypeSelected(TransactionType.EXPENSE)
-        viewModel.onCreateAmountChanged(5000L)
-        viewModel.onCreateCategorySelected(expenseCategory.id)
-        viewModel.onCreateNoteChanged("")
 
-        viewModel.saveCreatedTransaction()
+        viewModel.deleteTransaction(sampleTransaction)
         advanceUntilIdle()
 
-        assertEquals(1, transactionRepository.insertCallCount)
-        val inserted = transactionRepository.insertedTransaction
-        assertNotNull(inserted)
-        assertNull(inserted?.note)
-        assertEquals("手动记账", inserted?.rawText)
-    }
-
-    @Test
-    fun onCreateTypeSelected_clearsCategoryWhenTypeMismatched() = runTest {
-        val transactionRepository = FakeTransactionRepository()
-        val categoryRepository = FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
-        val viewModel = RecordsViewModel(transactionRepository, categoryRepository)
-        advanceUntilIdle()
-        viewModel.startCreating()
-        viewModel.onCreateCategorySelected(expenseCategory.id)
-
-        viewModel.onCreateTypeSelected(TransactionType.INCOME)
-
-        assertNull(viewModel.uiState.value.createCategoryId)
+        assertEquals(1, transactionRepository.deleteCallCount)
     }
 }
 
@@ -169,10 +167,12 @@ class MainDispatcherRule(
     }
 }
 
-private class FakeTransactionRepository : TransactionRepository {
-    private val transactionsFlow = MutableStateFlow<List<Transaction>>(emptyList())
-    var insertedTransaction: Transaction? = null
-    var insertCallCount: Int = 0
+private class FakeTransactionRepository(
+    initialTransactions: List<Transaction>
+) : TransactionRepository {
+    private val transactionsFlow = MutableStateFlow(initialTransactions)
+    val updatedTransactions = mutableListOf<Transaction>()
+    var deleteCallCount: Int = 0
 
     override fun getAllTransactions(): Flow<List<Transaction>> = transactionsFlow
 
@@ -183,18 +183,22 @@ private class FakeTransactionRepository : TransactionRepository {
 
     override fun searchTransactions(keyword: String): Flow<List<Transaction>> = flowOf(emptyList())
 
-    override suspend fun getTransactionById(id: Long): Transaction? = null
+    override suspend fun getTransactionById(id: Long): Transaction? =
+        transactionsFlow.value.find { it.id == id }
 
-    override suspend fun insertTransaction(transaction: Transaction): Long {
-        insertCallCount += 1
-        insertedTransaction = transaction
-        transactionsFlow.value = transactionsFlow.value + transaction.copy(id = insertCallCount.toLong())
-        return insertCallCount.toLong()
+    override suspend fun insertTransaction(transaction: Transaction): Long = 1L
+
+    override suspend fun updateTransaction(transaction: Transaction) {
+        updatedTransactions += transaction
+        transactionsFlow.value = transactionsFlow.value.map {
+            if (it.id == transaction.id) transaction else it
+        }
     }
 
-    override suspend fun updateTransaction(transaction: Transaction) = Unit
-
-    override suspend fun deleteTransaction(transaction: Transaction) = Unit
+    override suspend fun deleteTransaction(transaction: Transaction) {
+        deleteCallCount += 1
+        transactionsFlow.value = transactionsFlow.value.filterNot { it.id == transaction.id }
+    }
 
     override suspend fun deleteAllTransactions() = Unit
 }

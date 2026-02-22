@@ -78,22 +78,17 @@ class SecurePrefs(context: Context) {
     )
 
     fun saveApiKey(key: String) {
-        val sanitizedKey = sanitizeApiKey(key)
-        prefs.edit().putString(ApiConstants.KEY_API_KEY, sanitizedKey).apply()
+        val normalizedKey = ApiKeyValidator.normalize(key)
+        prefs.edit().putString(ApiConstants.KEY_API_KEY, normalizedKey).apply()
     }
 
     fun getApiKey(): String? = prefs.getString(ApiConstants.KEY_API_KEY, null)
-        ?.let(::sanitizeApiKey)
+        ?.let(ApiKeyValidator::normalize)
         ?.ifEmpty { null }
 
     fun hasApiKey(): Boolean = getApiKey() != null
 
     fun clearApiKey() {
         prefs.edit().remove(ApiConstants.KEY_API_KEY).apply()
-    }
-
-    // 统一移除所有空白字符，避免 Authorization 头中出现非法换行/空格
-    private fun sanitizeApiKey(raw: String): String {
-        return raw.filterNot { it.isWhitespace() }
     }
 }

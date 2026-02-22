@@ -31,7 +31,13 @@ data class HomeUiState(
     val error: String? = null,
     val successMessage: String? = null,
     val hasApiKey: Boolean = false,
-    val parseTime: Long? = null
+    val parseTime: Long? = null,
+    val isCreating: Boolean = false,
+    val createAmount: Long = 0,
+    val createCategoryId: Long? = null,
+    val createType: TransactionType = TransactionType.EXPENSE,
+    val createDate: Long = System.currentTimeMillis(),
+    val createNote: String = ""
 )
 
 @HiltViewModel
@@ -150,6 +156,56 @@ class HomeViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(selectedDate = date)
     }
 
+    fun startCreating() {
+        _uiState.value = _uiState.value.copy(
+            isCreating = true,
+            createAmount = 0,
+            createCategoryId = null,
+            createType = TransactionType.EXPENSE,
+            createDate = System.currentTimeMillis(),
+            createNote = "",
+            error = null,
+            successMessage = null
+        )
+    }
+
+    fun cancelCreating() {
+        _uiState.value = _uiState.value.copy(
+            isCreating = false,
+            createAmount = 0,
+            createCategoryId = null,
+            createType = TransactionType.EXPENSE,
+            createDate = System.currentTimeMillis(),
+            createNote = ""
+        )
+    }
+
+    fun onCreateAmountChanged(amount: Long) {
+        _uiState.value = _uiState.value.copy(createAmount = amount)
+    }
+
+    fun onCreateCategorySelected(categoryId: Long) {
+        _uiState.value = _uiState.value.copy(createCategoryId = categoryId)
+    }
+
+    fun onCreateTypeSelected(type: TransactionType) {
+        val state = _uiState.value
+        val newCategoryId = keepCategoryIfTypeMatched(
+            categoryId = state.createCategoryId,
+            type = type,
+            categories = state.categories
+        )
+        _uiState.value = state.copy(createType = type, createCategoryId = newCategoryId)
+    }
+
+    fun onCreateDateSelected(date: Long) {
+        _uiState.value = _uiState.value.copy(createDate = date)
+    }
+
+    fun onCreateNoteChanged(note: String) {
+        _uiState.value = _uiState.value.copy(createNote = note)
+    }
+
     fun saveTransaction() {
         val state = _uiState.value
 
@@ -191,7 +247,62 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun saveCreatedTransaction() {
+        val state = _uiState.value
+
+        if (state.createAmount <= 0) {
+            _uiState.value = state.copy(error = "请输入有效金额")
+            return
+        }
+
+        if (state.createCategoryId == null) {
+            _uiState.value = state.copy(error = "请选择分类")
+            return
+        }
+
+        viewModelScope.launch {
+            val category = categoryRepository.getCategoryById(state.createCategoryId)
+                ?: state.categories.first { it.id == state.createCategoryId }
+
+            val note = state.createNote.ifBlank { null }
+            // 手动新增无原始语句，rawText 用备注兜底保证可检索。
+            val rawText = state.createNote.ifBlank { "手动记账" }
+
+            val transaction = Transaction(
+                amountCents = state.createAmount,
+                categoryId = state.createCategoryId,
+                categoryNameSnapshot = category.name,
+                type = state.createType,
+                date = state.createDate,
+                note = note,
+                rawText = rawText
+            )
+
+            transactionRepository.insertTransaction(transaction)
+            _uiState.value = _uiState.value.copy(
+                isCreating = false,
+                createAmount = 0,
+                createCategoryId = null,
+                createType = TransactionType.EXPENSE,
+                createDate = System.currentTimeMillis(),
+                createNote = "",
+                error = null,
+                successMessage = "记账成功！"
+            )
+        }
+    }
+
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(error = null, successMessage = null)
+    }
+
+    private fun keepCategoryIfTypeMatched(
+        categoryId: Long?,
+        type: TransactionType,
+        categories: List<Category>
+    ): Long? {
+        val category = categories.find { it.id == categoryId } ?: return null
+        val isIncome = type == TransactionType.INCOME
+        return if (category.isIncome == isIncome) categoryId else null
     }
 }

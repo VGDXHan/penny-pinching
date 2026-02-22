@@ -87,3 +87,4 @@ app/src/main/java/com/example/voicebill/
 - **2026-02-18** [fix_statistics_flicker.md](doc/20260218_fix_statistics_flicker.md) - 修复统计页面闪烁问题、移除不必要的页面刷新、修复饼图点击和列表滚动
 - **2026-02-18** [fix_statistics_crash.md](doc/20260218_fix_statistics_crash.md) - 修复底部菜单进入统计页崩溃，约束分类占比与图表进度范围
 - **2026-02-18** [fix_statistics_nested_scroll_crash.md](doc/20260218_fix_statistics_nested_scroll_crash.md) - 修复统计页嵌套滚动导致点击进入即闪退问题
+- **2026-02-22** [home_fab_and_apikey_validation.md](doc/20260222_home_fab_and_apikey_validation.md) - 迁移手动记账入口到记账页，并在配置阶段前置校验 API Key
