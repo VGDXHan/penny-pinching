@@ -30,7 +30,7 @@ class StatisticsViewModel @Inject constructor(
     val uiState: StateFlow<StatisticsUiState> = _uiState.asStateFlow()
 
     init {
-        loadStatistics()
+        loadStatistics(showLoading = true)
     }
 
     fun onPeriodSelected(period: StatisticsPeriod) {
@@ -39,15 +39,7 @@ class StatisticsViewModel @Inject constructor(
             selectedExpenseCategoryId = null,
             selectedIncomeCategoryId = null
         )
-        // 直接加载数据，避免显示加载指示器导致闪烁
-        viewModelScope.launch {
-            try {
-                val result = getStatisticsUseCase.getStatistics(period)
-                _uiState.value = _uiState.value.copy(statistics = result)
-            } catch (e: Exception) {
-                // 静默处理错误
-            }
-        }
+        loadStatistics(showLoading = false)
     }
 
     fun onExpenseCategorySelected(categoryId: Long?) {
@@ -64,25 +56,39 @@ class StatisticsViewModel @Inject constructor(
         )
     }
 
-    // 刷新统计数据，用于页面重新显示时更新数据
-    fun refresh() {
-        loadStatistics()
+    // 页面进入时静默刷新，避免闪烁
+    fun onScreenEntered() {
+        if (_uiState.value.isLoading) return
+        loadStatistics(showLoading = false)
     }
 
-    private fun loadStatistics() {
+    // 刷新统计数据，用于页面重新显示时更新数据
+    fun refresh() {
+        onScreenEntered()
+    }
+
+    private fun loadStatistics(showLoading: Boolean) {
+        if (_uiState.value.isLoading) return
+
+        if (showLoading) {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        }
+
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val result = getStatisticsUseCase.getStatistics(_uiState.value.selectedPeriod)
                 _uiState.value = _uiState.value.copy(
                     statistics = result,
-                    isLoading = false
+                    isLoading = false,
+                    error = null
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message
-                )
+                if (showLoading) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message
+                    )
+                }
             }
         }
     }

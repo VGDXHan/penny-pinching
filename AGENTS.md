@@ -88,3 +88,4 @@ app/src/main/java/com/example/voicebill/
 - **2026-02-18** [fix_statistics_crash.md](doc/20260218_fix_statistics_crash.md) - 修复底部菜单进入统计页崩溃，约束分类占比与图表进度范围
 - **2026-02-18** [fix_statistics_nested_scroll_crash.md](doc/20260218_fix_statistics_nested_scroll_crash.md) - 修复统计页嵌套滚动导致点击进入即闪退问题
 - **2026-02-22** [home_fab_and_apikey_validation.md](doc/20260222_home_fab_and_apikey_validation.md) - 迁移手动记账入口到记账页，并在配置阶段前置校验 API Key
+- **2026-03-03** [statistics_open_refresh.md](doc/20260303_statistics_open_refresh.md) - 进入统计页自动静默刷新一次，修复需手动点周期才刷新的问题

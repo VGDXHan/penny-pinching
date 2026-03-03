@@ -24,6 +24,10 @@ fun StatisticsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(Unit) {
+        viewModel.onScreenEntered()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
