@@ -170,12 +170,8 @@ fun HomeScreen(
 
                         // 金额输入
                         OutlinedTextField(
-                            value = (uiState.amount / 100.0).toString(),
-                            onValueChange = { input ->
-                                input.toDoubleOrNull()?.let {
-                                    viewModel.onAmountChanged(Math.round(it * 100))
-                                }
-                            },
+                            value = uiState.amountInputText,
+                            onValueChange = viewModel::onAmountInputChanged,
                             label = { Text("金额") },
                             prefix = { Text("¥") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -363,3 +359,4 @@ fun HomeScreen(
         )
     }
 }
+
