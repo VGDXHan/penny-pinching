@@ -1,4 +1,4 @@
-package com.example.voicebill.data.repository
+﻿package com.example.voicebill.data.repository
 
 import com.example.voicebill.data.local.dao.TransactionDao
 import com.example.voicebill.data.local.entity.TransactionEntity
@@ -28,6 +28,16 @@ class TransactionRepositoryImpl @Inject constructor(
 
     override fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>> {
         return transactionDao.getTransactionsByCategory(categoryId).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override fun getTransactionsByCategoryAndDateRange(
+        categoryId: Long,
+        startDate: Long,
+        endDate: Long
+    ): Flow<List<Transaction>> {
+        return transactionDao.getTransactionsByCategoryAndDateRange(categoryId, startDate, endDate).map { entities ->
             entities.map { it.toDomain() }
         }
     }
