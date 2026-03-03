@@ -92,3 +92,4 @@ app/src/main/java/com/example/voicebill/
 - **2026-03-03** [export_loading_0b_fix.md](doc/20260303_export_loading_0b_fix.md) - 修复导出一直加载与导出文件0B问题，补充导出单元测试
 - **2026-03-03** [manual_entry_amount_input_fix.md](doc/20260303_manual_entry_amount_input_fix.md) - 修复解析页金额输入错位、支持删除小数点与0并补充单元测试
 - **2026-03-03** [statistics_category_drilldown.md](doc/20260303_statistics_category_drilldown.md) - 统计页支持分类条目下钻明细，页内展开并可编辑/删除
+- **2026-03-03** [statistics_custom_range.md](doc/20260303_statistics_custom_range.md) - 统计页支持按日/周/月/年回看历史并新增自定义时间范围筛选

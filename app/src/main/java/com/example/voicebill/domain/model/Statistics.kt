@@ -1,4 +1,4 @@
-package com.example.voicebill.domain.model
+﻿package com.example.voicebill.domain.model
 
 /**
  * 统计周期类型
@@ -7,8 +7,20 @@ enum class StatisticsPeriod {
     DAILY,
     WEEKLY,
     MONTHLY,
-    YEARLY
+    YEARLY,
+    CUSTOM
 }
+
+data class CustomDateRange(
+    val startUtcDateMillis: Long,
+    val endUtcDateMillis: Long
+)
+
+data class StatisticsQuery(
+    val period: StatisticsPeriod,
+    val offset: Int = 0,
+    val customRange: CustomDateRange? = null
+)
 
 /**
  * 分类汇总数据

@@ -2,6 +2,7 @@
 
 import com.example.voicebill.domain.model.Category
 import com.example.voicebill.domain.model.CategorySummary
+import com.example.voicebill.domain.model.CustomDateRange
 import com.example.voicebill.domain.model.StatisticsPeriod
 import com.example.voicebill.domain.model.StatisticsResult
 import com.example.voicebill.domain.model.Transaction
@@ -9,6 +10,7 @@ import com.example.voicebill.domain.model.TransactionType
 import com.example.voicebill.domain.repository.CategoryRepository
 import com.example.voicebill.domain.repository.TransactionRepository
 import com.example.voicebill.domain.usecase.GetStatisticsUseCase
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -24,6 +26,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -96,6 +99,12 @@ class StatisticsViewModelTest {
         endDate = 3000L
     )
 
+    private val customStats = monthlyStats.copy(
+        period = StatisticsPeriod.CUSTOM,
+        startDate = 3000L,
+        endDate = 5000L
+    )
+
     @Test
     fun onExpenseCategorySelected_shouldLoadCategoryTransactionsByCurrentPeriod() = runTest {
         val useCase = mockk<GetStatisticsUseCase>()
@@ -148,8 +157,16 @@ class StatisticsViewModelTest {
     @Test
     fun onPeriodSelected_shouldResetExpandedCategoryAndDetails() = runTest {
         val useCase = mockk<GetStatisticsUseCase>()
-        coEvery { useCase.getStatistics(StatisticsPeriod.MONTHLY) } returns monthlyStats
-        coEvery { useCase.getStatistics(StatisticsPeriod.WEEKLY) } returns weeklyStats
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0 && it.customRange == null
+            })
+        } returns monthlyStats
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.WEEKLY && it.offset == 0 && it.customRange == null
+            })
+        } returns weeklyStats
 
         val transactionRepository = FakeTransactionRepository()
         transactionRepository.setCategoryRangeTransactions(
@@ -170,9 +187,112 @@ class StatisticsViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(StatisticsPeriod.WEEKLY, state.selectedPeriod)
+        assertEquals(0, state.periodOffset)
+        assertNull(state.customRange)
         assertEquals(StatisticsPeriod.WEEKLY, state.statistics?.period)
         assertNull(state.selectedExpenseCategoryId)
         assertTrue(state.expenseCategoryTransactions.isEmpty())
+    }
+
+    @Test
+    fun onPreviousPeriod_shouldIncreaseOffsetAndQueryHistory() = runTest {
+        val useCase = mockk<GetStatisticsUseCase>()
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0
+            })
+        } returns monthlyStats
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 1
+            })
+        } returns monthlyStats.copy(startDate = 0L, endDate = 1000L)
+
+        val viewModel = StatisticsViewModel(
+            useCase,
+            FakeTransactionRepository(),
+            FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
+        )
+        advanceUntilIdle()
+        clearMocks(useCase, answers = false, recordedCalls = true)
+
+        viewModel.onPreviousPeriod()
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.periodOffset)
+        coVerify {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 1 && it.customRange == null
+            })
+        }
+    }
+
+    @Test
+    fun onNextPeriod_shouldDecreaseOffsetWhenInHistory() = runTest {
+        val useCase = mockk<GetStatisticsUseCase>()
+        coEvery { useCase.getStatistics(any()) } returns monthlyStats
+
+        val viewModel = StatisticsViewModel(
+            useCase,
+            FakeTransactionRepository(),
+            FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
+        )
+        advanceUntilIdle()
+
+        viewModel.onPreviousPeriod()
+        advanceUntilIdle()
+        clearMocks(useCase, answers = false, recordedCalls = true)
+
+        viewModel.onNextPeriod()
+        advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.periodOffset)
+        coVerify {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0 && it.customRange == null
+            })
+        }
+    }
+
+    @Test
+    fun onCustomRangeConfirmed_shouldSwitchToCustomAndQueryCustomRange() = runTest {
+        val useCase = mockk<GetStatisticsUseCase>()
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0 && it.customRange == null
+            })
+        } returns monthlyStats
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.CUSTOM &&
+                    it.customRange == CustomDateRange(100L, 200L)
+            })
+        } returns customStats
+
+        val viewModel = StatisticsViewModel(
+            useCase,
+            FakeTransactionRepository(),
+            FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
+        )
+        advanceUntilIdle()
+        clearMocks(useCase, answers = false, recordedCalls = true)
+
+        viewModel.onCustomRangeClick()
+        assertTrue(viewModel.uiState.value.showCustomRangePicker)
+
+        viewModel.onCustomRangeConfirmed(100L, 200L)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(StatisticsPeriod.CUSTOM, state.selectedPeriod)
+        assertEquals(0, state.periodOffset)
+        assertEquals(CustomDateRange(100L, 200L), state.customRange)
+        assertFalse(state.showCustomRangePicker)
+        coVerify {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.CUSTOM && it.customRange == CustomDateRange(100L, 200L)
+            })
+        }
     }
 
     @Test
@@ -197,7 +317,11 @@ class StatisticsViewModelTest {
         assertEquals(5200L, updated.amountCents)
         assertEquals("晚餐", updated.note)
         assertNull(viewModel.uiState.value.editingTransaction)
-        coVerify(atLeast = 2) { useCase.getStatistics(StatisticsPeriod.MONTHLY) }
+        coVerify(atLeast = 2) {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0 && it.customRange == null
+            })
+        }
     }
 
     @Test
@@ -233,7 +357,11 @@ class StatisticsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, transactionRepository.deleteCallCount)
-        coVerify(atLeast = 2) { useCase.getStatistics(StatisticsPeriod.MONTHLY) }
+        coVerify(atLeast = 2) {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0 && it.customRange == null
+            })
+        }
     }
 }
 
@@ -338,4 +466,3 @@ private class FakeCategoryRepository(
 
     override suspend fun restoreCategory(id: Long) = Unit
 }
-

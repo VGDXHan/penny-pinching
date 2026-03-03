@@ -3,7 +3,9 @@
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.voicebill.domain.model.Category
+import com.example.voicebill.domain.model.CustomDateRange
 import com.example.voicebill.domain.model.StatisticsPeriod
+import com.example.voicebill.domain.model.StatisticsQuery
 import com.example.voicebill.domain.model.StatisticsResult
 import com.example.voicebill.domain.model.Transaction
 import com.example.voicebill.domain.model.TransactionType
@@ -20,6 +22,8 @@ import javax.inject.Inject
 
 data class StatisticsUiState(
     val selectedPeriod: StatisticsPeriod = StatisticsPeriod.MONTHLY,
+    val periodOffset: Int = 0,
+    val customRange: CustomDateRange? = null,
     val statistics: StatisticsResult? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -35,7 +39,8 @@ data class StatisticsUiState(
     val editCategoryId: Long? = null,
     val editType: TransactionType = TransactionType.EXPENSE,
     val editDate: Long = System.currentTimeMillis(),
-    val editNote: String = ""
+    val editNote: String = "",
+    val showCustomRangePicker: Boolean = false
 )
 
 @HiltViewModel
@@ -61,12 +66,85 @@ class StatisticsViewModel @Inject constructor(
         incomeDetailJob?.cancel()
         _uiState.value = _uiState.value.copy(
             selectedPeriod = period,
+            periodOffset = 0,
+            customRange = null,
+            showCustomRangePicker = false,
             selectedExpenseCategoryId = null,
             selectedIncomeCategoryId = null,
             expenseCategoryTransactions = emptyList(),
             incomeCategoryTransactions = emptyList(),
             isExpenseDetailLoading = false,
-            isIncomeDetailLoading = false
+            isIncomeDetailLoading = false,
+            error = null
+        )
+        loadStatistics(showLoading = false)
+    }
+
+    fun onPreviousPeriod() {
+        if (_uiState.value.selectedPeriod == StatisticsPeriod.CUSTOM) return
+
+        expenseDetailJob?.cancel()
+        incomeDetailJob?.cancel()
+        _uiState.value = _uiState.value.copy(
+            periodOffset = _uiState.value.periodOffset + 1,
+            selectedExpenseCategoryId = null,
+            selectedIncomeCategoryId = null,
+            expenseCategoryTransactions = emptyList(),
+            incomeCategoryTransactions = emptyList(),
+            isExpenseDetailLoading = false,
+            isIncomeDetailLoading = false,
+            error = null
+        )
+        loadStatistics(showLoading = false)
+    }
+
+    fun onNextPeriod() {
+        val currentState = _uiState.value
+        if (currentState.selectedPeriod == StatisticsPeriod.CUSTOM || currentState.periodOffset == 0) {
+            return
+        }
+
+        expenseDetailJob?.cancel()
+        incomeDetailJob?.cancel()
+        _uiState.value = _uiState.value.copy(
+            periodOffset = currentState.periodOffset - 1,
+            selectedExpenseCategoryId = null,
+            selectedIncomeCategoryId = null,
+            expenseCategoryTransactions = emptyList(),
+            incomeCategoryTransactions = emptyList(),
+            isExpenseDetailLoading = false,
+            isIncomeDetailLoading = false,
+            error = null
+        )
+        loadStatistics(showLoading = false)
+    }
+
+    fun onCustomRangeClick() {
+        _uiState.value = _uiState.value.copy(showCustomRangePicker = true)
+    }
+
+    fun onCustomRangeDismiss() {
+        _uiState.value = _uiState.value.copy(showCustomRangePicker = false)
+    }
+
+    fun onCustomRangeConfirmed(startUtcDateMillis: Long, endUtcDateMillis: Long) {
+        expenseDetailJob?.cancel()
+        incomeDetailJob?.cancel()
+        _uiState.value = _uiState.value.copy(
+            selectedPeriod = StatisticsPeriod.CUSTOM,
+            periodOffset = 0,
+            customRange = CustomDateRange(
+                startUtcDateMillis = startUtcDateMillis,
+                endUtcDateMillis = endUtcDateMillis
+            ),
+            showCustomRangePicker = false,
+            selectedExpenseCategoryId = null,
+            selectedIncomeCategoryId = null,
+            expenseCategoryTransactions = emptyList(),
+            incomeCategoryTransactions = emptyList(),
+            isExpenseDetailLoading = false,
+            isIncomeDetailLoading = false,
+            error = null
         )
         loadStatistics(showLoading = false)
     }
@@ -199,12 +277,18 @@ class StatisticsViewModel @Inject constructor(
     }
 
     private fun loadStatistics(showLoading: Boolean) {
+        val query = buildCurrentQuery() ?: return
+
+        if (showLoading) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null
+            )
+        }
+
         viewModelScope.launch {
-            if (showLoading) {
-                _uiState.value = _uiState.value.copy(isLoading = true)
-            }
             try {
-                val result = getStatisticsUseCase.getStatistics(_uiState.value.selectedPeriod)
+                val result = getStatisticsUseCase.getStatistics(query)
                 _uiState.value = _uiState.value.copy(
                     statistics = result,
                     isLoading = false,
@@ -223,6 +307,18 @@ class StatisticsViewModel @Inject constructor(
 
     private fun refreshStatisticsSilently() {
         loadStatistics(showLoading = false)
+    }
+
+    private fun buildCurrentQuery(): StatisticsQuery? {
+        val state = _uiState.value
+        if (state.selectedPeriod == StatisticsPeriod.CUSTOM && state.customRange == null) {
+            return null
+        }
+        return StatisticsQuery(
+            period = state.selectedPeriod,
+            offset = state.periodOffset,
+            customRange = state.customRange
+        )
     }
 
     private fun updateExpenseCategoryDetails(categoryId: Long?) {
