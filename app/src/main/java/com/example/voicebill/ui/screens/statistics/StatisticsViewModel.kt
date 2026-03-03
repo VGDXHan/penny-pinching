@@ -260,12 +260,19 @@ class StatisticsViewModel @Inject constructor(
         }
     }
 
+    // 页面进入时静默刷新，避免闪烁
+    fun onScreenEntered() {
+        if (_uiState.value.isLoading) return
+        loadStatistics(showLoading = false)
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
 
+    // 复用页面进入刷新逻辑
     fun refresh() {
-        loadStatistics(showLoading = true)
+        onScreenEntered()
     }
 
     private fun loadCategories() {

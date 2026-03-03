@@ -195,6 +195,29 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun onScreenEntered_shouldRefreshSilently() = runTest {
+        val useCase = mockk<GetStatisticsUseCase>()
+        coEvery { useCase.getStatistics(any()) } returns monthlyStats
+
+        val viewModel = StatisticsViewModel(
+            useCase,
+            FakeTransactionRepository(),
+            FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
+        )
+        advanceUntilIdle()
+        clearMocks(useCase, answers = false, recordedCalls = true)
+
+        viewModel.onScreenEntered()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0 && it.customRange == null
+            })
+        }
+    }
+
+    @Test
     fun onPreviousPeriod_shouldIncreaseOffsetAndQueryHistory() = runTest {
         val useCase = mockk<GetStatisticsUseCase>()
         coEvery {
@@ -291,6 +314,45 @@ class StatisticsViewModelTest {
         coVerify {
             useCase.getStatistics(match {
                 it.period == StatisticsPeriod.CUSTOM && it.customRange == CustomDateRange(100L, 200L)
+            })
+        }
+    }
+
+    @Test
+    fun refresh_shouldKeepCurrentCustomQuery() = runTest {
+        val useCase = mockk<GetStatisticsUseCase>()
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.MONTHLY && it.offset == 0 && it.customRange == null
+            })
+        } returns monthlyStats
+        coEvery {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.CUSTOM &&
+                    it.offset == 0 &&
+                    it.customRange == CustomDateRange(1000L, 2000L)
+            })
+        } returns customStats
+
+        val viewModel = StatisticsViewModel(
+            useCase,
+            FakeTransactionRepository(),
+            FakeCategoryRepository(listOf(expenseCategory, incomeCategory))
+        )
+        advanceUntilIdle()
+
+        viewModel.onCustomRangeConfirmed(1000L, 2000L)
+        advanceUntilIdle()
+        clearMocks(useCase, answers = false, recordedCalls = true)
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        coVerify {
+            useCase.getStatistics(match {
+                it.period == StatisticsPeriod.CUSTOM &&
+                    it.offset == 0 &&
+                    it.customRange == CustomDateRange(1000L, 2000L)
             })
         }
     }
