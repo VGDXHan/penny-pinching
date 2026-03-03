@@ -1,4 +1,4 @@
-package com.example.voicebill.ui.screens.records
+﻿package com.example.voicebill.ui.screens.records
 
 import com.example.voicebill.domain.model.Category
 import com.example.voicebill.domain.model.Transaction
@@ -181,6 +181,12 @@ private class FakeTransactionRepository(
 
     override fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>> = flowOf(emptyList())
 
+    override fun getTransactionsByCategoryAndDateRange(
+        categoryId: Long,
+        startDate: Long,
+        endDate: Long
+    ): Flow<List<Transaction>> = flowOf(emptyList())
+
     override fun searchTransactions(keyword: String): Flow<List<Transaction>> = flowOf(emptyList())
 
     override suspend fun getTransactionById(id: Long): Transaction? =
@@ -234,3 +240,5 @@ private class FakeCategoryRepository(
 
     override suspend fun restoreCategory(id: Long) = Unit
 }
+
+

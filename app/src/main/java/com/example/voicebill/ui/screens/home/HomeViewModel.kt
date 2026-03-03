@@ -26,6 +26,7 @@ data class HomeUiState(
     val selectedCategoryId: Long? = null,
     val selectedType: TransactionType = TransactionType.EXPENSE,
     val amount: Long = 0,
+    val amountInputText: String = "",
     val selectedDate: Long = System.currentTimeMillis(),
     val note: String = "",
     val error: String? = null,
@@ -47,6 +48,7 @@ class HomeViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val securePrefs: SecurePrefs
 ) : ViewModel() {
+    private val amountInputPattern = Regex("^\\d*(\\.\\d{0,2})?$")
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -102,6 +104,7 @@ class HomeViewModel @Inject constructor(
                     parseResult = result,
                     selectedType = type,
                     amount = result.amountCents,
+                    amountInputText = formatCentsToInputText(result.amountCents),
                     selectedCategoryId = resolvedCategoryId,
                     selectedDate = result.date ?: System.currentTimeMillis(),
                     note = result.note ?: "",
@@ -146,6 +149,14 @@ class HomeViewModel @Inject constructor(
 
     fun onAmountChanged(amount: Long) {
         _uiState.value = _uiState.value.copy(amount = amount)
+    }
+
+    fun onAmountInputChanged(input: String) {
+        if (!isValidAmountInput(input)) return
+        _uiState.value = _uiState.value.copy(
+            amountInputText = input,
+            amount = parseAmountInputToCents(input)
+        )
     }
 
     fun onNoteChanged(note: String) {
@@ -241,6 +252,7 @@ class HomeViewModel @Inject constructor(
                 inputText = "",
                 parseResult = null,
                 amount = 0,
+                amountInputText = "",
                 note = "",
                 successMessage = "记账成功！"
             )
@@ -305,4 +317,31 @@ class HomeViewModel @Inject constructor(
         val isIncome = type == TransactionType.INCOME
         return if (category.isIncome == isIncome) categoryId else null
     }
+
+    private fun isValidAmountInput(input: String): Boolean {
+        return amountInputPattern.matches(input)
+    }
+
+    private fun parseAmountInputToCents(input: String): Long {
+        if (input.isEmpty() || input == ".") return 0L
+
+        val parts = input.split(".")
+        val integerPart = parts[0].ifEmpty { "0" }.toLong()
+        val fractionPart = parts.getOrElse(1) { "" }
+        val fractionCents = fractionPart.padEnd(2, '0').take(2).ifEmpty { "0" }.toLong()
+        return integerPart * 100 + fractionCents
+    }
+
+    private fun formatCentsToInputText(cents: Long): String {
+        if (cents <= 0) return ""
+        val integerPart = cents / 100
+        val fractionPart = (cents % 100).toInt()
+
+        return when {
+            fractionPart == 0 -> integerPart.toString()
+            fractionPart % 10 == 0 -> "$integerPart.${fractionPart / 10}"
+            else -> "$integerPart.${fractionPart.toString().padStart(2, '0')}"
+        }
+    }
 }
+

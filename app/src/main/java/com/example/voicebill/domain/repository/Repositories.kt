@@ -1,4 +1,4 @@
-package com.example.voicebill.domain.repository
+﻿package com.example.voicebill.domain.repository
 
 import com.example.voicebill.domain.model.BillInfo
 import com.example.voicebill.domain.model.Category
@@ -26,6 +26,11 @@ interface TransactionRepository {
     fun getAllTransactions(): Flow<List<Transaction>>
     fun getTransactionsByDateRange(startDate: Long, endDate: Long): Flow<List<Transaction>>
     fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>>
+    fun getTransactionsByCategoryAndDateRange(
+        categoryId: Long,
+        startDate: Long,
+        endDate: Long
+    ): Flow<List<Transaction>>
     fun searchTransactions(keyword: String): Flow<List<Transaction>>
     suspend fun getTransactionById(id: Long): Transaction?
     suspend fun insertTransaction(transaction: Transaction): Long

@@ -33,6 +33,7 @@ class BillParserRepositoryImpl @Inject constructor(
 
     private val gson = Gson()
     private val dateTextFormatter = DateTimeFormatter.ofPattern(DATE_TEXT_PATTERN)
+    private val amountExpressionEvaluator = AmountExpressionEvaluator()
 
     // 中文数字到阿拉伯数字的映射
     private val chineseNumbers = mapOf(
@@ -75,8 +76,8 @@ class BillParserRepositoryImpl @Inject constructor(
             val localResult = parseLocally(text)
             // 时间字段强制走 AI，避免本地粗解析导致偏移
             val apiResult = parseWithApi(text, apiKey)
-            if (!apiResult.parseSuccess) {
-                return apiResult
+            if (!apiResult.billInfo.parseSuccess) {
+                return apiResult.billInfo
             }
             return mergeLocalAndApiResult(localResult, apiResult)
         } catch (e: Exception) {
@@ -228,16 +229,19 @@ class BillParserRepositoryImpl @Inject constructor(
         return note.trim().ifEmpty { null }
     }
 
-    private suspend fun parseWithApi(text: String, apiKey: String): BillInfo {
+    private suspend fun parseWithApi(text: String, apiKey: String): ApiParseResult {
         val validation = ApiKeyValidator.validate(apiKey)
         if (!validation.isValid) {
-            return BillInfo(
-                amountCents = null,
-                categoryName = null,
-                type = null,
-                date = null,
-                parseSuccess = false,
-                errorMessage = validation.errorMessage ?: "请先在设置中配置正确的 DeepSeek API Key"
+            return ApiParseResult(
+                billInfo = BillInfo(
+                    amountCents = null,
+                    categoryName = null,
+                    type = null,
+                    date = null,
+                    parseSuccess = false,
+                    errorMessage = validation.errorMessage ?: "请先在设置中配置正确的 DeepSeek API Key"
+                ),
+                amountExpression = null
             )
         }
 
@@ -272,13 +276,16 @@ class BillParserRepositoryImpl @Inject constructor(
             request = request
         )
 
-        val content = response.choices.firstOrNull()?.message?.content ?: return BillInfo(
-            amountCents = null,
-            categoryName = null,
-            type = null,
-            date = null,
-            parseSuccess = false,
-            errorMessage = "API 返回为空"
+        val content = response.choices.firstOrNull()?.message?.content ?: return ApiParseResult(
+            billInfo = BillInfo(
+                amountCents = null,
+                categoryName = null,
+                type = null,
+                date = null,
+                parseSuccess = false,
+                errorMessage = "API 返回为空"
+            ),
+            amountExpression = null
         )
 
         return try {
@@ -286,23 +293,27 @@ class BillParserRepositoryImpl @Inject constructor(
             parseApiResponse(content)
         } catch (e: Exception) {
             // 解析失败，尝试提取 JSON
-            extractJsonFromResponse(content) ?: BillInfo(
-                amountCents = null,
-                categoryName = null,
-                type = null,
-                date = null,
-                parseSuccess = false,
-                errorMessage = "解析 API 响应失败: ${e.message}"
+            extractJsonFromResponse(content) ?: ApiParseResult(
+                billInfo = BillInfo(
+                    amountCents = null,
+                    categoryName = null,
+                    type = null,
+                    date = null,
+                    parseSuccess = false,
+                    errorMessage = "解析 API 响应失败: ${e.message}"
+                ),
+                amountExpression = null
             )
         }
     }
 
-    private fun parseApiResponse(content: String): BillInfo {
+    private fun parseApiResponse(content: String): ApiParseResult {
         try {
             val cleanedContent = stripCodeFence(content)
             val json = gson.fromJson(cleanedContent, Map::class.java)
 
             val amountCents = (json["amountCents"] as? Number)?.toLong()
+            val amountExpression = (json["amountExpression"] as? String)?.trim()?.ifEmpty { null }
             val categoryName = json["categoryName"] as? String
             val typeStr = json["type"] as? String
             val dateText = json["dateText"] as? String
@@ -318,20 +329,23 @@ class BillParserRepositoryImpl @Inject constructor(
             val dateTimestamp = parseDateTextToEpochMillis(dateText, timezone)
                 ?: clock.instant().toEpochMilli()
 
-            return BillInfo(
-                amountCents = amountCents,
-                categoryName = categoryName,
-                type = type,
-                date = dateTimestamp,
-                note = note,
-                parseSuccess = true
+            return ApiParseResult(
+                billInfo = BillInfo(
+                    amountCents = amountCents,
+                    categoryName = categoryName,
+                    type = type,
+                    date = dateTimestamp,
+                    note = note,
+                    parseSuccess = true
+                ),
+                amountExpression = amountExpression
             )
         } catch (e: JsonSyntaxException) {
             throw e
         }
     }
 
-    private fun extractJsonFromResponse(content: String): BillInfo? {
+    private fun extractJsonFromResponse(content: String): ApiParseResult? {
         // 尝试提取 JSON 对象
         val jsonPattern = Pattern.compile("\\{[^}]+\\}")
         val matcher = jsonPattern.matcher(stripCodeFence(content))
@@ -364,14 +378,15 @@ class BillParserRepositoryImpl @Inject constructor(
         return localDateTime.atZone(zoneId).toInstant().toEpochMilli()
     }
 
-    private fun mergeLocalAndApiResult(localResult: BillInfo, apiResult: BillInfo): BillInfo {
-        val mergedAmount = localResult.amountCents ?: apiResult.amountCents
-        val mergedType = apiResult.type ?: localResult.type
-        val mergedCategory = apiResult.categoryName ?: localResult.categoryName
-        val mergedNote = apiResult.note ?: localResult.note
+    private fun mergeLocalAndApiResult(localResult: BillInfo, apiResult: ApiParseResult): BillInfo {
+        val expressionAmount = apiResult.amountExpression?.let { amountExpressionEvaluator.evaluateToCents(it) }
+        val mergedAmount = expressionAmount ?: localResult.amountCents ?: apiResult.billInfo.amountCents
+        val mergedType = apiResult.billInfo.type ?: localResult.type
+        val mergedCategory = apiResult.billInfo.categoryName ?: localResult.categoryName
+        val mergedNote = apiResult.billInfo.note ?: localResult.note
         val parseSuccess = mergedAmount != null
 
-        return apiResult.copy(
+        return apiResult.billInfo.copy(
             amountCents = mergedAmount,
             type = mergedType,
             categoryName = mergedCategory,
@@ -387,13 +402,22 @@ class BillParserRepositoryImpl @Inject constructor(
 
             输出字段：
             - amountCents: 金额（分，整数）
+            - amountExpression: 金额表达式（单位“元”），仅包含数字、小数点、+ - * / ( )；无法构造则为空字符串
             - categoryName: 分类名，无法确定填"未分类"。支出分类优先从：$expenseCategories；收入分类优先从：$incomeCategories。
             - type: "income" 或 "expense"
             - dateText: 绝对时间字符串，格式固定 yyyy-MM-dd HH:mm:ss
             - timezone: 固定 "Asia/Shanghai"
             - note: 备注，可空字符串
 
-            硬规则：
+            金额解析硬规则：
+            1) 先抽取所有金额片段，再构造 amountExpression（单位=元）。
+            2) 同一句并列金额默认相加；返现/退款/优惠/扣费对应金额用减法；折扣转乘法（8折=0.8）。
+            3) 若出现“分”，先换算为元再放入 amountExpression。
+            4) amountCents = 四舍五入(amountExpression计算结果 * 100)。
+            5) 若 amountExpression 可计算，amountCents 必须与其严格一致。
+            6) 若无法可靠构造表达式，amountExpression 置空字符串，并尽最大努力给出 amountCents。
+
+            时间解析硬规则：
             1) 先基于“当前时间锚点”计算绝对日期，再填 dateText。
             2) 周起始是周一，周结束是周日。
             3) 若用户含“上周X”：目标日期 = 上周周一 + (X的星期索引-1)天。
@@ -409,6 +433,7 @@ class BillParserRepositoryImpl @Inject constructor(
             9) 输出前必须自检：
                - 含“上周”时，dateText 必须落在上周区间；
                - 含“下周”时，dateText 必须落在下周区间；
+               - amountExpression 可计算时，amountCents 必须等于 round(expression*100)；
                - 不满足则重新计算后再输出。
             10) 只输出 JSON，不允许输出额外字段和解释文本。
         """.trimIndent()
@@ -462,6 +487,11 @@ class BillParserRepositoryImpl @Inject constructor(
         val currentWeekMonday: String,
         val previousWeekMonday: String,
         val nextWeekMonday: String
+    )
+
+    private data class ApiParseResult(
+        val billInfo: BillInfo,
+        val amountExpression: String?
     )
 
     companion object {

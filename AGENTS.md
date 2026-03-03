@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 ## 项目概述
 
@@ -88,3 +88,11 @@ app/src/main/java/com/example/voicebill/
 - **2026-02-18** [fix_statistics_crash.md](doc/20260218_fix_statistics_crash.md) - 修复底部菜单进入统计页崩溃，约束分类占比与图表进度范围
 - **2026-02-18** [fix_statistics_nested_scroll_crash.md](doc/20260218_fix_statistics_nested_scroll_crash.md) - 修复统计页嵌套滚动导致点击进入即闪退问题
 - **2026-02-22** [home_fab_and_apikey_validation.md](doc/20260222_home_fab_and_apikey_validation.md) - 迁移手动记账入口到记账页，并在配置阶段前置校验 API Key
+- **2026-03-03** [amount_expression_prompt_upgrade.md](doc/20260303_amount_expression_prompt_upgrade.md) - 增强 DeepSeek 提示词并新增金额表达式程序计算，修复多金额与分元换算问题
+- **2026-03-03** [export_loading_0b_fix.md](doc/20260303_export_loading_0b_fix.md) - 修复导出一直加载与导出文件0B问题，补充导出单元测试
+- **2026-03-03** [manual_entry_amount_input_fix.md](doc/20260303_manual_entry_amount_input_fix.md) - 修复解析页金额输入错位、支持删除小数点与0并补充单元测试
+- **2026-03-03** [statistics_category_drilldown.md](doc/20260303_statistics_category_drilldown.md) - 统计页支持分类条目下钻明细，页内展开并可编辑/删除
+- **2026-03-03** [statistics_custom_range.md](doc/20260303_statistics_custom_range.md) - 统计页支持按日/周/月/年回看历史并新增自定义时间范围筛选
+- **2026-03-03** [statistics_open_refresh.md](doc/20260303_statistics_open_refresh.md) - 进入统计页自动静默刷新一次，修复需手动点周期才刷新的问题
+- **2026-03-04** [import_confirm_fix.md](doc/20260304_import_confirm_fix.md) - 修复导入确认后未执行导入，补充空JSON用于清空导入测试并重打Debug APK
+- **2026-03-04** [statistics_datepicker_interaction_polish.md](doc/20260304_statistics_datepicker_interaction_polish.md) - 优化统计页日期选择器文案与布局，修复头部对齐与确认按钮不可见问题

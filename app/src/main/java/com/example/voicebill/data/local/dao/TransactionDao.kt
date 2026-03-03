@@ -1,4 +1,4 @@
-package com.example.voicebill.data.local.dao
+﻿package com.example.voicebill.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
@@ -20,6 +20,13 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE categoryId = :categoryId ORDER BY date DESC, createdAt DESC")
     fun getTransactionsByCategory(categoryId: Long): Flow<List<TransactionEntity>>
+
+    @Query("SELECT * FROM transactions WHERE categoryId = :categoryId AND date >= :startDate AND date < :endDate ORDER BY date DESC, createdAt DESC")
+    fun getTransactionsByCategoryAndDateRange(
+        categoryId: Long,
+        startDate: Long,
+        endDate: Long
+    ): Flow<List<TransactionEntity>>
 
     @Query("SELECT * FROM transactions WHERE type = :type ORDER BY date DESC, createdAt DESC")
     fun getTransactionsByType(type: String): Flow<List<TransactionEntity>>

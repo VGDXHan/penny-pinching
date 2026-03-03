@@ -65,7 +65,7 @@ class BillParserRepositoryImplTest {
     fun `parseBillText should merge local amount and api dateText`() = runTest {
         coEvery { deepSeekApi.createChatCompletion(any(), any()) } returns buildResponse(
             """
-            {"amountCents":2100,"categoryName":"交通","type":"expense","dateText":"2026-02-23 08:00:00","timezone":"Asia/Shanghai","note":"开会打车"}
+            {"amountCents":2100,"amountExpression":"","categoryName":"交通","type":"expense","dateText":"2026-02-23 08:00:00","timezone":"Asia/Shanghai","note":"开会打车"}
             """.trimIndent()
         )
 
@@ -84,7 +84,7 @@ class BillParserRepositoryImplTest {
     fun `parseBillText should fallback to current time when dateText is invalid`() = runTest {
         coEvery { deepSeekApi.createChatCompletion(any(), any()) } returns buildResponse(
             """
-            {"amountCents":3200,"categoryName":"餐饮","type":"expense","dateText":"not-a-date","timezone":"Asia/Shanghai","note":"吃饭"}
+            {"amountCents":3200,"amountExpression":"","categoryName":"餐饮","type":"expense","dateText":"not-a-date","timezone":"Asia/Shanghai","note":"吃饭"}
             """.trimIndent()
         )
 
@@ -99,7 +99,7 @@ class BillParserRepositoryImplTest {
         val requestSlot = slot<ChatCompletionRequest>()
         coEvery { deepSeekApi.createChatCompletion(any(), capture(requestSlot)) } returns buildResponse(
             """
-            {"amountCents":5300,"categoryName":"餐饮","type":"expense","dateText":"2026-02-11 19:00:00","timezone":"Asia/Shanghai","note":"烧烤"}
+            {"amountCents":5300,"amountExpression":"","categoryName":"餐饮","type":"expense","dateText":"2026-02-11 19:00:00","timezone":"Asia/Shanghai","note":"烧烤"}
             """.trimIndent()
         )
 
@@ -110,6 +110,7 @@ class BillParserRepositoryImplTest {
         assertEquals("system", messages[0].role)
         assertEquals("user", messages[1].role)
         assertTrue(messages[0].content.contains("dateText"))
+        assertTrue(messages[0].content.contains("amountExpression"))
         assertTrue(messages[1].content.contains("当前星期：周日"))
         assertTrue(messages[1].content.contains("本周周一：2026-02-16"))
         assertTrue(messages[1].content.contains("上周周一：2026-02-09"))
@@ -122,7 +123,7 @@ class BillParserRepositoryImplTest {
         coEvery { deepSeekApi.createChatCompletion(any(), any()) } returns buildResponse(
             """
             ```json
-            {"amountCents":1800,"categoryName":"餐饮","type":"expense","dateText":"2026-02-21 08:00:00","timezone":"Asia/Shanghai","note":"咖啡"}
+            {"amountCents":1800,"amountExpression":"","categoryName":"餐饮","type":"expense","dateText":"2026-02-21 08:00:00","timezone":"Asia/Shanghai","note":"咖啡"}
             ```
             """.trimIndent()
         )
@@ -134,6 +135,35 @@ class BillParserRepositoryImplTest {
             Instant.parse("2026-02-21T00:00:00Z").toEpochMilli(),
             result.date
         )
+    }
+
+    @Test
+    fun `parseBillText should prefer amount expression when expression is valid`() = runTest {
+        coEvery { deepSeekApi.createChatCompletion(any(), any()) } returns buildResponse(
+            """
+            {"amountCents":4500,"amountExpression":"36+12","categoryName":"餐饮","type":"expense","dateText":"2026-02-22 08:00:00","timezone":"Asia/Shanghai","note":"早餐"}
+            """.trimIndent()
+        )
+
+        val result = repository.parseBillText("今天买了一杯小米粥36块，还有一份12块的炒面")
+
+        assertTrue(result.parseSuccess)
+        assertEquals(4800L, result.amountCents)
+    }
+
+    @Test
+    fun `parseBillText should fallback to local amount when expression is invalid`() = runTest {
+        coEvery { deepSeekApi.createChatCompletion(any(), any()) } returns buildResponse(
+            """
+            {"amountCents":9999,"amountExpression":"100*","categoryName":"餐饮","type":"expense","dateText":"2026-02-22 08:00:00","timezone":"Asia/Shanghai","note":"早餐"}
+            """.trimIndent()
+        )
+
+        val result = repository.parseBillText("今天买了一杯小米粥36块，还有一份12块的炒面")
+
+        assertTrue(result.parseSuccess)
+        // 本地解析当前只取首个金额 36 元
+        assertEquals(3600L, result.amountCents)
     }
 
     @Test
