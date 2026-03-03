@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -42,6 +44,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -89,11 +93,11 @@ fun StatisticsScreen(
                 .padding(16.dp)
         ) {
             item {
-                Row(
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
                 ) {
-                    periodOptions.forEach { period ->
+                    items(items = periodOptions, key = { period -> period.name }) { period ->
                         FilterChip(
                             selected = uiState.selectedPeriod == period,
                             onClick = {
@@ -103,7 +107,14 @@ fun StatisticsScreen(
                                     viewModel.onPeriodSelected(period)
                                 }
                             },
-                            label = { Text(period.toDisplayText()) }
+                            label = {
+                                Text(
+                                    text = period.toDisplayText(),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         )
                     }
                 }
@@ -294,31 +305,62 @@ fun StatisticsScreen(
             initialSelectedStartDateMillis = uiState.customRange?.startUtcDateMillis,
             initialSelectedEndDateMillis = uiState.customRange?.endUtcDateMillis
         )
+        val start = dateRangePickerState.selectedStartDateMillis
+        val end = dateRangePickerState.selectedEndDateMillis
 
         DatePickerDialog(
             onDismissRequest = { viewModel.onCustomRangeDismiss() },
-            confirmButton = {
-                val start = dateRangePickerState.selectedStartDateMillis
-                val end = dateRangePickerState.selectedEndDateMillis
-                TextButton(
-                    enabled = start != null && end != null,
-                    onClick = {
-                        viewModel.onCustomRangeConfirmed(
-                            startUtcDateMillis = start!!,
-                            endUtcDateMillis = end!!
+            confirmButton = {},
+            dismissButton = {}
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 420.dp, max = 520.dp)
+            ) {
+                DateRangePicker(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 56.dp),
+                    state = dateRangePickerState,
+                    title = null,
+                    showModeToggle = false,
+                    headline = {
+                        Text(
+                            text = formatDateRangePickerHeadline(
+                                startUtcMillis = start,
+                                endUtcMillis = end
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("确定")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.onCustomRangeDismiss() }) {
-                    Text("取消")
+                    TextButton(
+                        enabled = start != null && end != null,
+                        onClick = {
+                            viewModel.onCustomRangeConfirmed(
+                                startUtcDateMillis = start!!,
+                                endUtcDateMillis = end!!
+                            )
+                        }
+                    ) {
+                        Text("确认")
+                    }
                 }
             }
-        ) {
-            DateRangePicker(state = dateRangePickerState)
         }
     }
 
@@ -407,12 +449,30 @@ private fun StatisticsRangeNavigationCard(
 
 private fun StatisticsPeriod.toDisplayText(): String {
     return when (this) {
-        StatisticsPeriod.DAILY -> "今日"
-        StatisticsPeriod.WEEKLY -> "本周"
-        StatisticsPeriod.MONTHLY -> "本月"
-        StatisticsPeriod.YEARLY -> "今年"
+        StatisticsPeriod.DAILY -> "日"
+        StatisticsPeriod.WEEKLY -> "周"
+        StatisticsPeriod.MONTHLY -> "月"
+        StatisticsPeriod.YEARLY -> "年"
         StatisticsPeriod.CUSTOM -> "自定义"
     }
+}
+
+internal fun formatDateRangePickerHeadline(
+    startUtcMillis: Long?,
+    endUtcMillis: Long?,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): String {
+    val formatter = DateTimeFormatter.ofPattern("yyyy/M/d")
+    fun Long.toDisplayDate(): String =
+        Instant.ofEpochMilli(this).atZone(zoneId).toLocalDate().format(formatter)
+
+    if (startUtcMillis == null && endUtcMillis == null) {
+        return "开始 - 结束"
+    }
+
+    val startText = startUtcMillis?.toDisplayDate() ?: "开始"
+    val endText = endUtcMillis?.toDisplayDate() ?: "结束"
+    return "$startText - $endText"
 }
 
 private fun formatDisplayRange(startDate: Long, endDate: Long): String {
