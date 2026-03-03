@@ -2,6 +2,7 @@ package com.example.voicebill.ui.screens.settings
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,7 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showImportConfirm by remember { mutableStateOf(false) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
 
     // 导出文件选择器
     val exportLauncher = rememberLauncherForActivityResult(
@@ -38,6 +40,7 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
+            pendingImportUri = it
             showImportConfirm = true
         }
     }
@@ -228,21 +231,28 @@ fun SettingsScreen(
         // 导入确认对话框
         if (showImportConfirm) {
             AlertDialog(
-                onDismissRequest = { showImportConfirm = false },
+                onDismissRequest = {
+                    showImportConfirm = false
+                    pendingImportUri = null
+                },
                 title = { Text("确认导入") },
                 text = { Text("导入数据将覆盖现有所有记录，确定要继续吗？") },
                 confirmButton = {
                     TextButton(
                         onClick = {
+                            pendingImportUri?.let(viewModel::importData)
                             showImportConfirm = false
-                            // 需要保存 URI 引用，这里简化处理
+                            pendingImportUri = null
                         }
                     ) {
                         Text("确定")
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showImportConfirm = false }) {
+                    TextButton(onClick = {
+                        showImportConfirm = false
+                        pendingImportUri = null
+                    }) {
                         Text("取消")
                     }
                 }

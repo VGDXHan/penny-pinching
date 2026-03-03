@@ -94,3 +94,4 @@ app/src/main/java/com/example/voicebill/
 - **2026-03-03** [statistics_category_drilldown.md](doc/20260303_statistics_category_drilldown.md) - 统计页支持分类条目下钻明细，页内展开并可编辑/删除
 - **2026-03-03** [statistics_custom_range.md](doc/20260303_statistics_custom_range.md) - 统计页支持按日/周/月/年回看历史并新增自定义时间范围筛选
 - **2026-03-03** [statistics_open_refresh.md](doc/20260303_statistics_open_refresh.md) - 进入统计页自动静默刷新一次，修复需手动点周期才刷新的问题
+- **2026-03-04** [import_confirm_fix.md](doc/20260304_import_confirm_fix.md) - 修复导入确认后未执行导入，补充空JSON用于清空导入测试并重打Debug APK
