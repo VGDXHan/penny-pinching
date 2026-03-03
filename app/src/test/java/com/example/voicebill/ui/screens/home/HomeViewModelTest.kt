@@ -185,6 +185,69 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `parseText 成功后应同步金额输入文本`() = runTest {
+        val viewModel = createViewModel(
+            listOf(expenseUncategorized, incomeUncategorized, transportCategory)
+        )
+        coEvery { billParserRepository.parseBillText(any()) } returns BillInfo(
+            amountCents = 1230L,
+            categoryName = "交通",
+            type = TransactionType.EXPENSE,
+            date = 1_700_000_000_000L,
+            note = "打车",
+            parseSuccess = true
+        )
+
+        viewModel.onInputTextChanged("打车 12.3")
+        viewModel.parseText()
+        advanceUntilIdle()
+
+        assertEquals(1230L, viewModel.uiState.value.amount)
+        assertEquals("12.3", viewModel.uiState.value.amountInputText)
+    }
+
+    @Test
+    fun `onAmountInputChanged 应支持删除小数点和0`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized, transportCategory))
+        advanceUntilIdle()
+
+        viewModel.onAmountInputChanged("12.30")
+        assertEquals("12.30", viewModel.uiState.value.amountInputText)
+        assertEquals(1230L, viewModel.uiState.value.amount)
+
+        viewModel.onAmountInputChanged("12.3")
+        assertEquals("12.3", viewModel.uiState.value.amountInputText)
+        assertEquals(1230L, viewModel.uiState.value.amount)
+
+        viewModel.onAmountInputChanged("12.")
+        assertEquals("12.", viewModel.uiState.value.amountInputText)
+        assertEquals(1200L, viewModel.uiState.value.amount)
+
+        viewModel.onAmountInputChanged("12")
+        assertEquals("12", viewModel.uiState.value.amountInputText)
+        assertEquals(1200L, viewModel.uiState.value.amount)
+
+        viewModel.onAmountInputChanged("")
+        assertEquals("", viewModel.uiState.value.amountInputText)
+        assertEquals(0L, viewModel.uiState.value.amount)
+    }
+
+    @Test
+    fun `onAmountInputChanged 非法输入应忽略`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized, transportCategory))
+        advanceUntilIdle()
+
+        viewModel.onAmountInputChanged("12.3")
+        viewModel.onAmountInputChanged("12.345")
+        assertEquals("12.3", viewModel.uiState.value.amountInputText)
+        assertEquals(1230L, viewModel.uiState.value.amount)
+
+        viewModel.onAmountInputChanged("1..2")
+        assertEquals("12.3", viewModel.uiState.value.amountInputText)
+        assertEquals(1230L, viewModel.uiState.value.amount)
+    }
+
+    @Test
     fun `startCreating 应设置手动新增默认值`() = runTest {
         val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized))
         advanceUntilIdle()
@@ -197,6 +260,23 @@ class HomeViewModelTest {
         assertEquals(0L, state.createAmount)
         assertNull(state.createCategoryId)
         assertEquals("", state.createNote)
+    }
+
+    @Test
+    fun `saveTransaction 成功后应清空解析金额输入文本`() = runTest {
+        val viewModel = createViewModel(listOf(expenseUncategorized, incomeUncategorized, transportCategory))
+        coEvery { categoryRepository.getCategoryById(transportCategory.id) } returns transportCategory
+        coEvery { transactionRepository.insertTransaction(any()) } returns 1L
+        advanceUntilIdle()
+
+        viewModel.onAmountInputChanged("12.30")
+        viewModel.onCategorySelected(transportCategory.id)
+        viewModel.saveTransaction()
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.uiState.value.amountInputText)
+        assertEquals(0L, viewModel.uiState.value.amount)
+        coVerify(exactly = 1) { transactionRepository.insertTransaction(any()) }
     }
 
     @Test
@@ -304,3 +384,4 @@ class MainDispatcherRule(
         Dispatchers.resetMain()
     }
 }
+
