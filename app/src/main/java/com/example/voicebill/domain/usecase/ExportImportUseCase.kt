@@ -11,6 +11,7 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -34,19 +35,13 @@ class ExportImportUseCase @Inject constructor(
 
     suspend fun exportData(uri: Uri): DataOperationResult = withContext(Dispatchers.IO) {
         try {
-            // 获取所有数据
-            val categories = mutableListOf<com.example.voicebill.data.local.CategoryExport>()
-            val transactions = mutableListOf<com.example.voicebill.data.local.TransactionExport>()
-
-            // 收集分类数据
-            categoryDao.getAllCategories().collect { categoryEntities ->
-                categories.addAll(categoryEntities.map { it.toExport() })
-            }
-
-            // 收集交易数据
-            transactionDao.getAllTransactions().collect { transactionEntities ->
-                transactions.addAll(transactionEntities.map { it.toExport() })
-            }
+            // 获取一次性快照数据，避免持续 Flow collect 导致导出无法结束
+            val categories = categoryDao.getAllCategories()
+                .first()
+                .map { it.toExport() }
+            val transactions = transactionDao.getAllTransactions()
+                .first()
+                .map { it.toExport() }
 
             // 创建导出数据
             val exportData = ExportData(
