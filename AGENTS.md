@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 ## 项目概述
 
@@ -88,3 +88,5 @@ app/src/main/java/com/example/voicebill/
 - **2026-02-18** [fix_statistics_crash.md](doc/20260218_fix_statistics_crash.md) - 修复底部菜单进入统计页崩溃，约束分类占比与图表进度范围
 - **2026-02-18** [fix_statistics_nested_scroll_crash.md](doc/20260218_fix_statistics_nested_scroll_crash.md) - 修复统计页嵌套滚动导致点击进入即闪退问题
 - **2026-02-22** [home_fab_and_apikey_validation.md](doc/20260222_home_fab_and_apikey_validation.md) - 迁移手动记账入口到记账页，并在配置阶段前置校验 API Key
+- **2026-03-03** [statistics_category_drilldown.md](doc/20260303_statistics_category_drilldown.md) - 统计页支持分类条目下钻明细，页内展开并可编辑/删除
+
